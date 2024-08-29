@@ -13,6 +13,11 @@ pacman::p_load(tidyverse, rjags, tidybayes)
 ## Load data
 
 ```{r}
+pcv7_st <- c("4","6B","9V","14","18C","19F","23F")
+pcv13_st <- c("1","3","4","5","6A","6B","7F","9V","14","18C","19A","19F","23F")
+pcv15_st <- c("1","3","4","5","6A","6B","7F","9V","14","18C","19A","19F","22F","23F","33F")
+pcv20_st <- c("1","3","4","5","6A","6B","7F","8","9V","10A","11A","12F","14","15B","18C","19A","19F","22F","23F","33F")
+
 data_raw <- read_rds("data/ABCs_st_1998_2021.rds")
 
 data <- data_raw |> 
@@ -23,7 +28,17 @@ data <- data_raw |>
   mutate(st = if_else(st == '16', '16F', st))  |> 
   group_by(st, year) |> 
   summarize(N_IPD = sum(N_IPD))  |> 
-  ungroup()
+  ungroup() |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  mutate(pcv7 = if_else(st %in% pcv7_st, 1, 0),
+         pcv13 = if_else(st %in% pcv13_st, 1, 0),
+         pcv15 = if_else(st %in% pcv15_st, 1, 0),
+         pcv20 = if_else(st %in% pcv20_st, 1, 0),
+         firstvax = case_when(pcv7 == 1 ~ "pcv7",
+                              pcv13 == 1 ~ "pcv13",
+                              pcv15 == 1 ~ "pcv15",
+                              pcv20 == 1 ~ "pcv20",
+                              .default = ""))
 ```
 
 ## 1: Only PCV-7 serotypes
@@ -31,9 +46,6 @@ data <- data_raw |>
 ### Wrangle data
 
 ```{r}
-# define  serotypes to include in model
-pcv7_st <- c('4','6B','9V','14','18C','19F','23F')
-
 # wrangle dataframe
 mod1_df <- data |> 
   complete(st, year, fill = list(N_IPD = 0))  |> 
@@ -154,6 +166,15 @@ mod1_summary |>
   facet_wrap(~st) +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
+
+mod1_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
 ```
 
 ```{r}
@@ -169,6 +190,15 @@ data |>
   group_by(st) |> 
   summarise(N_IPD = sum(N_IPD)) |> 
   arrange(N_IPD)
+```
+
+```{r, fig.width = 10, fig.height = 14}
+data |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  ggplot(aes(x = year, y = N_IPD)) +
+  geom_line() +
+  facet_wrap(~st) +
+  theme_bw()
 ```
 
 ### Wrangle data
@@ -227,6 +257,15 @@ mod2_summary <- gather_draws(mod2_postsamp, lambda[i,j]) |>
 ```
 
 ```{r, fig.width = 11}
+mod2_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
 mod2_summary |> 
   ggplot(aes(x = year, y = .value)) +
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
@@ -315,6 +354,15 @@ mod3_summary |>
   facet_wrap(~st) +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
+
+mod3_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
 ```
 
 ```{r}
@@ -394,6 +442,400 @@ mod4_summary |>
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
   facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
+mod4_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+```{r}
+# run in console
+# plot(mod4_postsamp, ask = TRUE)
+```
+
+```{r}
+# traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+## 5: Changing parameters of AR1 - increased precision for tau_eps (Most-common non-PCV-7 serotypes plus five uncommon serotypes)
+
+```{r}
+mod2_string <- "
+  model {
+    
+    for(i in 1:N_years){
+      
+      for(j in 1:N_sts){
+        N_IPD[i,j] ~ dnegbin(prob[i,j], r[j])
+        
+        prob[i,j]<- r[j] / (r[j] + lambda[i,j])  # Likelihood 
+        
+        log(lambda[i,j]) <- epsilon1[i,j]        # serotype-specific intercept + AR(1) effect centered around global effects
+        }
+      }
+    
+    # Global AR(1) effect
+        beta1[1] ~ dnorm(alpha1, (1 - rho_beta^2) * tau_beta1)
+        
+    for(i in 2:N_years){
+      beta1[i] ~ dnorm(alpha1 + rho_beta * beta1[i-1], tau_beta1)
+      }
+        
+    # Serotype-specific AR(1) effect
+    
+    for(j in 1:N_sts){
+      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1], (1 - rho_eps^2) * tau_eps)
+      
+      for(i in 2:N_years){
+        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] + rho_eps * epsilon1[i-1, j], tau_eps)
+        }
+      }
+        
+    # Priors
+    alpha1 ~ dnorm(0, 1e-4)
+    tau_global ~ dgamma(0.01,0.01)
+
+    rho_beta ~ dunif(-1, 1)   # Uniform prior for rho_beta -- global AR(1)
+    rho_eps ~ dunif(-1, 1)    # Prior for rho_eps same for all STs
+    
+    tau_beta1 ~ dgamma(3, 2)  # Tight prior for tau
+    tau_eps ~ dgamma(10, 5)   # INCREASED PRECISION FOR TAU, shared for all serotypes
+    
+    for(j in 1:N_sts){
+       delta1[j] ~ dnorm(0, tau_global)  # serotype means centered around 0
+      
+       r[j] ~ dunif(0, 250) #serotype dispersion parameter
+      }
+}"
+```
+
+### Create JAGS model object
+
+```{r}
+mod5 <- jags.model(textConnection(mod2_string),
+                   data = list("N_IPD" = mod4_mat,
+                               "N_years" = max(mod4_df$year_n),
+                               "N_sts" = ncol(mod4_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors
+
+```{r}
+mod5_postsamp <- coda.samples(mod5, params1, n.iter = 10000)
+```
+
+### Plot results
+
+```{r}
+mod5_summary <- gather_draws(mod5_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping4[as.character(st)],
+         year = year_mapping4[as.character(year)]) |> 
+  left_join(mod4_df, by = c("year", "st"))
+```
+
+```{r, fig.width = 11}
+mod5_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
+mod5_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+```{r}
+# run in console
+# plot(mod4_postsamp, ask = TRUE)
+```
+
+```{r}
+# traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+## 6: Changing parameters of AR1 - decreased precision for tau_eps (Most-common non-PCV-7 serotypes plus five uncommon serotypes)
+
+```{r}
+mod3_string <- "
+  model {
+    
+    for(i in 1:N_years){
+      
+      for(j in 1:N_sts){
+        N_IPD[i,j] ~ dnegbin(prob[i,j], r[j])
+        
+        prob[i,j]<- r[j] / (r[j] + lambda[i,j])  # Likelihood 
+        
+        log(lambda[i,j]) <- epsilon1[i,j]        # serotype-specific intercept + AR(1) effect centered around global effects
+        }
+      }
+    
+    # Global AR(1) effect
+        beta1[1] ~ dnorm(alpha1, (1 - rho_beta^2) * tau_beta1)
+        
+    for(i in 2:N_years){
+      beta1[i] ~ dnorm(alpha1 + rho_beta * beta1[i-1], tau_beta1)
+      }
+        
+    # Serotype-specific AR(1) effect
+    
+    for(j in 1:N_sts){
+      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1], (1 - rho_eps^2) * tau_eps)
+      
+      for(i in 2:N_years){
+        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] + rho_eps * epsilon1[i-1, j], tau_eps)
+        }
+      }
+        
+    # Priors
+    alpha1 ~ dnorm(0, 1e-4)
+    tau_global ~ dgamma(0.01,0.01)
+
+    rho_beta ~ dunif(-1, 1)   # Uniform prior for rho_beta -- global AR(1)
+    rho_eps ~ dunif(-1, 1)    # Prior for rho_eps same for all STs
+    
+    tau_beta1 ~ dgamma(3, 2)  # Tight prior for tau
+    tau_eps ~ dgamma(1, 0.1)    # DECREASED PRECISION FOR TAU, shared for all serotypes
+    
+    for(j in 1:N_sts){
+       delta1[j] ~ dnorm(0, tau_global)  # serotype means centered around 0
+      
+       r[j] ~ dunif(0, 250) #serotype dispersion parameter
+      }
+}"
+```
+
+### Create JAGS model object
+
+```{r}
+mod6 <- jags.model(textConnection(mod3_string),
+                   data = list("N_IPD" = mod4_mat,
+                               "N_years" = max(mod4_df$year_n),
+                               "N_sts" = ncol(mod4_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors
+
+```{r}
+mod6_postsamp <- coda.samples(mod6, params1, n.iter = 10000)
+```
+
+### Plot results
+
+```{r}
+mod6_summary <- gather_draws(mod6_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping4[as.character(st)],
+         year = year_mapping4[as.character(year)]) |> 
+  left_join(mod4_df, by = c("year", "st"))
+```
+
+```{r, fig.width = 11}
+mod6_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
+mod6_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+## 7: Changing parameters of AR1 - reducing range of rho_eps (Most-common non-PCV-7 serotypes plus five uncommon serotypes)
+
+```{r}
+mod4_string <- "
+  model {
+    
+    for(i in 1:N_years){
+      
+      for(j in 1:N_sts){
+        N_IPD[i,j] ~ dnegbin(prob[i,j], r[j])
+        
+        prob[i,j]<- r[j] / (r[j] + lambda[i,j])  # Likelihood 
+        
+        log(lambda[i,j]) <- epsilon1[i,j]        # serotype-specific intercept + AR(1) effect centered around global effects
+        }
+      }
+    
+    # Global AR(1) effect
+        beta1[1] ~ dnorm(alpha1, (1 - rho_beta^2) * tau_beta1)
+        
+    for(i in 2:N_years){
+      beta1[i] ~ dnorm(alpha1 + rho_beta * beta1[i-1], tau_beta1)
+      }
+        
+    # Serotype-specific AR(1) effect
+    
+    for(j in 1:N_sts){
+      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1], (1 - rho_eps^2) * tau_eps)
+      
+      for(i in 2:N_years){
+        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] + rho_eps * epsilon1[i-1, j], tau_eps)
+        }
+      }
+        
+    # Priors
+    alpha1 ~ dnorm(0, 1e-4)
+    tau_global ~ dgamma(0.01,0.01)
+
+    rho_beta ~ dunif(-1, 1)   # Uniform prior for rho_beta -- global AR(1)
+    rho_eps ~ dunif(-0.5, 0.5)    # Prior for rho_eps same for all STs
+    
+    tau_beta1 ~ dgamma(3, 2)  # Tight prior for tau
+    tau_eps ~ dgamma(3, 2)    # Tight prior for tau, shared for all serotypes
+    
+    for(j in 1:N_sts){
+       delta1[j] ~ dnorm(0, tau_global)  # serotype means centered around 0
+      
+       r[j] ~ dunif(0, 250) #serotype dispersion parameter
+      }
+}"
+```
+
+### Create JAGS model object
+
+```{r}
+mod7 <- jags.model(textConnection(mod4_string),
+                   data = list("N_IPD" = mod4_mat,
+                               "N_years" = max(mod4_df$year_n),
+                               "N_sts" = ncol(mod4_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors
+
+```{r}
+mod7_postsamp <- coda.samples(mod7, params1, n.iter = 10000)
+```
+
+### Plot results
+
+```{r}
+mod7_summary <- gather_draws(mod7_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping4[as.character(st)],
+         year = year_mapping4[as.character(year)]) |> 
+  left_join(mod4_df, by = c("year", "st"))
+```
+
+```{r, fig.width = 14}
+mod7_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(firstvax ~ st, ncol = 5, axes = "all_x") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
+mod7_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(firstvax ~ st, scales = "free_y", ncol = 5, axes = "all_x") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+```{r}
+# run in console
+# plot(mod4_postsamp, ask = TRUE)
+```
+
+```{r}
+# traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+## 8: Changing parameters of AR1 - reducing range of rho_eps (PCV-7 serotypes plus five uncommon serotypes)
+
+### Create JAGS model object
+
+```{r}
+mod8 <- jags.model(textConnection(mod4_string),
+                   data = list("N_IPD" = mod2_mat,
+                               "N_years" = max(mod2_df$year_n),
+                               "N_sts" = ncol(mod2_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors
+
+```{r}
+mod8_postsamp <- coda.samples(mod8, params1, n.iter = 10000)
+```
+
+### Plot results
+
+```{r}
+mod8_summary <- gather_draws(mod8_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping2[as.character(st)],
+         year = year_mapping2[as.character(year)]) |> 
+  left_join(mod2_df, by = c("year", "st"))
+```
+
+```{r, fig.width = 11}
+mod8_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+
+mod8_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
 ```
