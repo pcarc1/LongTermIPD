@@ -68,19 +68,19 @@ mod1_string <- "
       }
     
     # Global AR(1) effect
-        beta1[1] ~ dnorm(alpha1, (1 - rho_beta^2) * tau.beta1)
+        beta1[1] ~ dnorm(alpha1, (1 - rho_beta^2) * tau_beta1)
         
     for(i in 2:N_years){
-      beta1[i] ~ dnorm(alpha1 + rho_beta * beta1[i-1], tau.beta1)
+      beta1[i] ~ dnorm(alpha1 + rho_beta * beta1[i-1], tau_beta1)
       }
         
     # Serotype-specific AR(1) effect
     
     for(j in 1:N_sts){
-      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1], (1 - rho_eps^2) * tau.eps)
+      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1], (1 - rho_eps^2) * tau_eps)
       
       for(i in 2:N_years){
-        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] + rho_eps * epsilon1[i-1, j], tau.eps)
+        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] + rho_eps * epsilon1[i-1, j], tau_eps)
         }
       }
         
@@ -91,8 +91,8 @@ mod1_string <- "
     rho_beta ~ dunif(-1, 1)   # Uniform prior for rho_beta -- global AR(1)
     rho_eps ~ dunif(-1, 1)    # Prior for rho_eps same for all STs
     
-    tau.beta1 ~ dgamma(3, 2)  # Tight prior for tau
-    tau.eps ~ dgamma(3, 2)    # Tight prior for tau, shared for all serotypes
+    tau_beta1 ~ dgamma(3, 2)  # Tight prior for tau
+    tau_eps ~ dgamma(3, 2)    # Tight prior for tau, shared for all serotypes
     
     for(j in 1:N_sts){
        delta1[j] ~ dnorm(0, tau_global)  # serotype means centered around 0
@@ -125,7 +125,7 @@ mod1 <- jags.model(textConnection(mod1_string),
 ### Sample posteriors
 
 ```{r}
-params1 <- c('alpha1', 'epsilon1', 'delta1', 'beta1', 'tau.beta1', 'lambda')
+params1 <- c('alpha1', 'epsilon1', 'delta1', 'beta1', 'tau_beta1', 'lambda')
 
 mod1_postsamp <- coda.samples(mod1, params1, n.iter = 10000)
 ```
