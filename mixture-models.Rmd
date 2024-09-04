@@ -9,7 +9,7 @@ output:
     df_print: paged
 ---
 
-```{r setup, include = FALSE}
+```{r setup}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, rjags, tidybayes)
 knitr::opts_chunk$set(cache = TRUE)
@@ -160,9 +160,9 @@ mod9 <- jags.model(textConnection(mod9_string),
 ### Sample posteriors {.tabset}
 
 ```{r, eval = FALSE}
-params9 <- c("alpha1", "epsilon1", "delta1", "beta1", "beta2", "tau_beta1", "lambda", "grp", "logit_pi")
+params9 <- c("alpha1", "epsilon1", "delta1", "beta1", "beta2", "tau_beta1", "lambda", "grp")
 
-mod9_postsamp <- coda.samples(mod9, params9, n.iter = 10000)
+mod9_postsamp <- coda.samples(mod9, params9, n.iter = 50000)
 
 # save(mod9_postsamp, file = "data/interim/mod9_postsamp.rda")
 ```
@@ -338,10 +338,10 @@ mod10_string <- "
     
     # Priors for group selection
     for(j in 1:N_sts){
-      logit_pi[j] ~ dnorm(0, 1e-4)  # Prior on logit(pi)
-      pi[j] <- exp(logit_pi[j]) / (exp(logit_pi[j]) + 1)  # Inverse logit
-      grp[j] ~ dbern(pi[j])  # Group assignment - 0 or 1
+      grp[j] ~ dbern(pi)  # Group assignment - 0 or 1
     }
+    
+    pi ~ dunif(0,1)
         
     # Priors
     alpha1 ~ dnorm(0, 1e-4)
@@ -379,7 +379,9 @@ mod10 <- jags.model(textConnection(mod10_string),
 ### Sample posteriors {.tabset}
 
 ```{r, eval = FALSE}
-mod10_postsamp <- coda.samples(mod10, params9, n.iter = 10000)
+params10 <- c("alpha1", "alpha2", "epsilon1", "delta1", "beta1", "beta2", "tau_beta1", "tau_beta2", "lambda", "rho_beta1", "rho_beta2", "rho_eps", "pi", "grp", "r")
+
+mod10_postsamp <- coda.samples(mod10, params10, n.iter = 10000)
 
 # save(mod10_postsamp, file = "data/interim/mod10_postsamp.rda")
 ```

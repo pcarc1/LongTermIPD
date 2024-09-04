@@ -9,7 +9,7 @@ output:
     df_print: paged
 ---
 
-```{r setup, include = FALSE}
+```{r setup}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, rjags, tidybayes)
 knitr::opts_chunk$set(cache = TRUE)
