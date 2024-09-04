@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+/analysis2_cache
+/analysis2_files
+/data/interim

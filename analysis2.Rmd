@@ -2,12 +2,18 @@
 title: "Long term trends in IPD in the US - JAGS models"
 author: "Paloma Cárcamo"
 date: "2024-08-28"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
 ---
 
-```{r setup}
+```{r setup, include = FALSE}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, rjags, tidybayes)
+
+knitr::opts_chunk$set(cache = TRUE)
 ```
 
 ## Load data
@@ -124,7 +130,7 @@ inits3 = list(".RNG.seed"=c(789), ".RNG.name"='base::Wichmann-Hill')
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod1 <- jags.model(textConnection(mod1_string),
                    data = list("N_IPD" = mod1_mat,
                                "N_years" = max(mod1_df$year_n),
@@ -136,15 +142,19 @@ mod1 <- jags.model(textConnection(mod1_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 params1 <- c('alpha1', 'epsilon1', 'delta1', 'beta1', 'tau_beta1', 'lambda')
 
 mod1_postsamp <- coda.samples(mod1, params1, n.iter = 10000)
+
+# save(mod1_postsamp, file = "data/interim/mod1_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod1_postsamp.rda")
+
 st_mapping <- setNames(colnames(mod1_mat), 1:length(pcv7_st))
 year_mapping <- setNames(unique(mod1_df$year), 1:25)
 
@@ -172,6 +182,16 @@ mod1_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod1_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
@@ -179,7 +199,22 @@ mod1_summary |>
 
 ```{r}
 # run in console
-plot(mod1_postsamp, ask = TRUE)
+# plot(mod1_postsamp, ask = TRUE)
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod1_beta1 <- gather_draws(mod1_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping[as.character(i)])
+
+mod1_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
 ```
 
 ## 2: PCV-7 serotypes plus five uncommon serotypes
@@ -225,7 +260,7 @@ mod2_mat <- mod2_df |>
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod2 <- jags.model(textConnection(mod1_string),
                    data = list("N_IPD" = mod2_mat,
                                "N_years" = max(mod2_df$year_n),
@@ -237,13 +272,17 @@ mod2 <- jags.model(textConnection(mod1_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod2_postsamp <- coda.samples(mod2, params1, n.iter = 10000)
+
+# save(mod2_postsamp, file = "data/interim/mod2_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod2_postsamp.rda")
+
 st_mapping2 <- setNames(colnames(mod2_mat), 1:length(pcv7plus_st))
 year_mapping2 <- setNames(unique(mod2_df$year), 1:25)
 
@@ -262,7 +301,7 @@ mod2_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
-  facet_wrap(~st, scales = "free_y") +
+  facet_wrap(~st) +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
 
@@ -272,6 +311,16 @@ mod2_summary |>
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
   facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod2_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
 ```
@@ -283,6 +332,21 @@ mod2_summary |>
 
 ```{r}
 # traceplot(mod2_postsamp[, grep("^lambda", varnames(mod2_postsamp))])
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod2_beta1 <- gather_draws(mod2_postsamp, beta1[i]) |>
+  median_hdi() |>
+  mutate(year = year_mapping2[as.character(i)])
+
+mod2_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
 ```
 
 ## 3: Most-common non-PCV-7 serotypes
@@ -314,7 +378,7 @@ mod3_mat <- mod3_df |>
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod3 <- jags.model(textConnection(mod1_string),
                    data = list("N_IPD" = mod3_mat,
                                "N_years" = max(mod3_df$year_n),
@@ -326,13 +390,17 @@ mod3 <- jags.model(textConnection(mod1_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod3_postsamp <- coda.samples(mod3, params1, n.iter = 10000)
+
+# save(mod3_postsamp, file = "data/interim/mod3_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod3_postsamp.rda")
+
 st_mapping3 <- setNames(colnames(mod3_mat), 1:length(nonpcv7_st))
 year_mapping3 <- setNames(unique(mod3_df$year), 1:25)
 
@@ -360,6 +428,16 @@ mod3_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod3_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
@@ -372,6 +450,21 @@ mod3_summary |>
 
 ```{r}
 # traceplot(mod3_postsamp[, grep("^lambda", varnames(mod3_postsamp))])
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod3_beta1 <- gather_draws(mod3_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping3[as.character(i)])
+
+mod3_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
 ```
 
 ## 4: Most-common non-PCV-7 serotypes plus five uncommon serotypes
@@ -404,7 +497,7 @@ mod4_mat <- mod4_df |>
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod4 <- jags.model(textConnection(mod1_string),
                    data = list("N_IPD" = mod4_mat,
                                "N_years" = max(mod4_df$year_n),
@@ -416,13 +509,17 @@ mod4 <- jags.model(textConnection(mod1_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod4_postsamp <- coda.samples(mod4, params1, n.iter = 10000)
+
+# save(mod4_postsamp, file = "data/interim/mod4_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod4_postsamp.rda")
+
 st_mapping4 <- setNames(colnames(mod4_mat), 1:length(nonpcv7plus_st))
 year_mapping4 <- setNames(unique(mod4_df$year), 1:25)
 
@@ -450,6 +547,16 @@ mod4_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod4_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
@@ -462,6 +569,21 @@ mod4_summary |>
 
 ```{r}
 # traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod4_beta1 <- gather_draws(mod4_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping4[as.character(i)])
+
+mod4_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
 ```
 
 ## 5: Changing parameters of AR1 - increased precision for tau_eps (Most-common non-PCV-7 serotypes plus five uncommon serotypes)
@@ -518,7 +640,7 @@ mod2_string <- "
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod5 <- jags.model(textConnection(mod2_string),
                    data = list("N_IPD" = mod4_mat,
                                "N_years" = max(mod4_df$year_n),
@@ -530,13 +652,17 @@ mod5 <- jags.model(textConnection(mod2_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod5_postsamp <- coda.samples(mod5, params1, n.iter = 10000)
+
+# save(mod5_postsamp, file = "data/interim/mod5_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod5_postsamp.rda")
+
 mod5_summary <- gather_draws(mod5_postsamp, lambda[i,j]) |> 
   median_hdi() |> 
   rename(year = i,
@@ -561,6 +687,16 @@ mod5_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod5_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
@@ -573,6 +709,21 @@ mod5_summary |>
 
 ```{r}
 # traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod5_beta1 <- gather_draws(mod5_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping4[as.character(i)])
+
+mod5_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
 ```
 
 ## 6: Changing parameters of AR1 - decreased precision for tau_eps (Most-common non-PCV-7 serotypes plus five uncommon serotypes)
@@ -629,7 +780,7 @@ mod3_string <- "
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod6 <- jags.model(textConnection(mod3_string),
                    data = list("N_IPD" = mod4_mat,
                                "N_years" = max(mod4_df$year_n),
@@ -641,13 +792,17 @@ mod6 <- jags.model(textConnection(mod3_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod6_postsamp <- coda.samples(mod6, params1, n.iter = 10000)
+
+# save(mod6_postsamp, file = "data/interim/mod6_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod6_postsamp.rda")
+
 mod6_summary <- gather_draws(mod6_postsamp, lambda[i,j]) |> 
   median_hdi() |> 
   rename(year = i,
@@ -672,8 +827,33 @@ mod6_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod6_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(~st, scales = "free_y") +
   labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod6_beta1 <- gather_draws(mod6_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping4[as.character(i)])
+
+mod6_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
   theme_minimal()
 ```
 
@@ -731,7 +911,7 @@ mod4_string <- "
 
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod7 <- jags.model(textConnection(mod4_string),
                    data = list("N_IPD" = mod4_mat,
                                "N_years" = max(mod4_df$year_n),
@@ -743,13 +923,17 @@ mod7 <- jags.model(textConnection(mod4_string),
 
 ### Sample posteriors
 
-```{r}
+```{r, eval = FALSE}
 mod7_postsamp <- coda.samples(mod7, params1, n.iter = 10000)
+
+# save(mod7_postsamp, file = "data/interim/mod7_postsamp.rda")
 ```
 
-### Plot results
+### Plot obs vs pred
 
 ```{r}
+load("data/interim/mod7_postsamp.rda")
+
 mod7_summary <- gather_draws(mod7_postsamp, lambda[i,j]) |> 
   median_hdi() |> 
   rename(year = i,
@@ -774,8 +958,33 @@ mod7_summary |>
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
   geom_point(aes(y = N_IPD, color = "Observed")) +
   geom_line(aes(color = "Fitted")) +
+  facet_wrap(firstvax ~ st, ncol = 5, axes = "all_x") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+
+mod7_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
   facet_wrap(firstvax ~ st, scales = "free_y", ncol = 5, axes = "all_x") +
   labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod7_beta1 <- gather_draws(mod7_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping4[as.character(i)])
+
+mod7_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
   theme_minimal()
 ```
 
@@ -790,9 +999,11 @@ mod7_summary |>
 
 ## 8: Changing parameters of AR1 - reducing range of rho_eps (PCV-7 serotypes plus five uncommon serotypes)
 
+(did not converge)
+
 ### Create JAGS model object
 
-```{r}
+```{r, eval = FALSE}
 mod8 <- jags.model(textConnection(mod4_string),
                    data = list("N_IPD" = mod2_mat,
                                "N_years" = max(mod2_df$year_n),
@@ -802,13 +1013,29 @@ mod8 <- jags.model(textConnection(mod4_string),
                    n.chains = 3)
 ```
 
-### Sample posteriors
+### Sample posteriors {.tabset}
 
-```{r}
-mod8_postsamp <- coda.samples(mod8, params1, n.iter = 10000)
+```{r, eval = FALSE}
+mod8_postsamp <- coda.samples(mod8, params1, n.iter = 50000)
+
+# save(mod8_postsamp, file = "data/interim/mod8_postsamp.rda")
 ```
 
-### Plot results
+```{r}
+load("data/interim/mod8_postsamp.rda")
+
+beta_vars8 <- grep("^beta", varnames(mod8_postsamp), value = TRUE)
+```
+
+```{r, results = 'asis'}
+for (i in seq_along(beta_vars8)) {
+  cat(paste0("#### ",i," \n"))
+  traceplot(mod8_postsamp[, beta_vars8[i]])
+  cat("```\n")
+}
+```
+
+### Plot obs vs pred {.tabset}
 
 ```{r}
 mod8_summary <- gather_draws(mod8_postsamp, lambda[i,j]) |> 
@@ -820,6 +1047,8 @@ mod8_summary <- gather_draws(mod8_postsamp, lambda[i,j]) |>
   left_join(mod2_df, by = c("year", "st"))
 ```
 
+#### A
+
 ```{r, fig.width = 11}
 mod8_summary |> 
   ggplot(aes(x = year, y = .value)) +
@@ -829,7 +1058,24 @@ mod8_summary |>
   facet_wrap(~st) +
   labs(x = "", y = "# IPD", color = "") +
   theme_minimal()
+```
 
+#### B
+
+```{r, fig.width = 11}
+mod8_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+#### C
+
+```{r, fig.width = 11}
 mod8_summary |> 
   ggplot(aes(x = year, y = .value)) +
   geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
@@ -847,4 +1093,399 @@ mod8_summary |>
 
 ```{r}
 # traceplot(mod4_postsamp[, grep("^lambda", varnames(mod4_postsamp))])
+```
+
+### Plot trajectory of global AR(1)
+
+```{r}
+mod8_beta1 <- gather_draws(mod8_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping2[as.character(i)])
+
+mod8_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1)") +
+  theme_minimal()
+```
+
+## 9: Mixture model with PCV-13
+
+(did not converge)
+
+### Wrangle data
+
+```{r}
+# wrangle dataframe
+mod9_df <- data |> 
+  complete(st, year, fill = list(N_IPD = 0))  |> 
+  arrange(st, year) |> 
+  filter(st %in% pcv13_st)  |> 
+  group_by(st) |> 
+  arrange(year) |> 
+  mutate(year_n = row_number()) |> 
+  ungroup()
+
+# convert to matrix
+mod9_mat <- mod9_df |> 
+  reshape2::dcast(year ~ st, value.var = 'N_IPD') |> 
+  dplyr::select(-year)
+```
+
+### Define model string
+
+```{r}
+mod9_string <- "
+  model {
+    
+    for(i in 1:N_years){
+      
+      for(j in 1:N_sts){
+        N_IPD[i,j] ~ dnegbin(prob[i,j], r[j])
+        
+        prob[i,j] <- r[j] / (r[j] + lambda[i,j])  # Likelihood 
+        
+        log(lambda[i,j]) <- epsilon1[i,j]  # Serotype-specific intercept + AR(1) effect
+      }
+    }
+    
+    # Global AR(1) effect for beta1
+    
+    beta1[1] ~ dnorm(alpha1, (1 - rho_beta1^2) * tau_beta1)
+    for(i in 2:N_years){
+      beta1[i] ~ dnorm(alpha1 + rho_beta1 * beta1[i-1], tau_beta1)
+    }
+    
+    # Global AR(1) effect for beta2
+    
+    beta2[1] ~ dnorm(alpha2, (1 - rho_beta2^2) * tau_beta2)
+    for(i in 2:N_years){
+      beta2[i] ~ dnorm(alpha2 + rho_beta2 * beta2[i-1], tau_beta2)
+    }
+        
+    # Serotype-specific AR(1) effect with group selection
+    for(j in 1:N_sts){
+      epsilon1[1,j] ~ dnorm(delta1[j] + beta1[1] * grp[j] + beta2[1] * (1 - grp[j]), 
+                            (1 - rho_eps^2) * tau_eps)
+      
+      for(i in 2:N_years){
+        epsilon1[i,j] ~ dnorm(delta1[j] + beta1[i] * grp[j] + beta2[i] * (1 - grp[j]) + 
+                              rho_eps * epsilon1[i-1, j], tau_eps)
+      }
+    }
+    
+    # Priors for group selection
+    for(j in 1:N_sts){
+      logit_pi[j] ~ dnorm(0, 1e-4)  # Prior on logit(pi)
+      pi[j] <- exp(logit_pi[j]) / (exp(logit_pi[j]) + 1)  # Inverse logit
+      grp[j] ~ dbern(pi[j])  # Group assignment - 0 or 1
+    }
+        
+    # Priors
+    alpha1 ~ dnorm(0, 1e-4)
+    alpha2 ~ dnorm(0, 1e-4)
+    tau_global ~ dgamma(0.01, 0.01)
+
+    rho_beta1 ~ dunif(-1, 1)   # Uniform prior for rho_beta1 -- global AR(1) for beta1
+    rho_beta2 ~ dunif(-1, 1)   # Uniform prior for rho_beta2 -- global AR(1) for beta2
+    rho_eps ~ dunif(-1, 1)     # Prior for rho_eps same for all STs
+    
+    tau_beta1 ~ dgamma(3, 2)   # Tight prior for tau for beta1
+    tau_beta2 ~ dgamma(3, 2)   # Tight prior for tau for beta2
+    tau_eps ~ dgamma(3, 2)     # Tight prior for tau, shared for all serotypes
+    
+    for(j in 1:N_sts){
+      delta1[j] ~ dnorm(0, tau_global)  # Serotype means centered around 0
+      r[j] ~ dunif(0, 250)  # Serotype dispersion parameter
+    }
+  }
+"
+```
+
+### Create JAGS model object
+
+```{r, eval = FALSE}
+mod9 <- jags.model(textConnection(mod9_string),
+                   data = list("N_IPD" = mod9_mat,
+                               "N_years" = max(mod9_df$year_n),
+                               "N_sts" = ncol(mod9_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors {.tabset}
+
+```{r, eval = FALSE}
+params9 <- c("alpha1", "epsilon1", "delta1", "beta1", "beta2", "tau_beta1", "lambda", "grp")
+
+mod9_postsamp <- coda.samples(mod9, params9, n.iter = 50000)
+
+# save(mod9_postsamp, file = "data/interim/mod9_postsamp.rda")
+```
+
+```{r}
+load("data/interim/mod9_postsamp.rda")
+
+beta_vars9 <- grep("^beta", varnames(mod9_postsamp), value = TRUE)
+```
+
+```{r, results = 'asis'}
+for (i in seq_along(beta_vars9)) {
+  cat(paste0("#### ",i," \n"))
+  traceplot(mod9_postsamp[, beta_vars9[i]])
+  cat("```\n")
+}
+```
+
+### AR1 groups
+
+```{r}
+st_mapping9 <- setNames(colnames(mod9_mat), 1:length(pcv13_st))
+year_mapping9 <- setNames(unique(mod9_df$year), 1:length(unique(mod9_df$year)))
+
+groups9 <- gather_draws(mod9_postsamp, grp[j]) |> 
+  rename(st = j) |> 
+  mutate(st = st_mapping9[as.character(st)])
+
+groups9_summary <- groups9 |> 
+  summarise(mean_grp = mean(.value))  |> 
+  mutate(assigned_group = ifelse(mean_grp > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
+
+groups9_summary |> 
+  group_by(assigned_group) |> 
+  summarise(serotypes = paste0(st, collapse = ", "))
+```
+
+### Plot obs vs pred {.tabset}
+
+```{r}
+mod9_summary <- gather_draws(mod9_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping9[as.character(st)],
+         year = year_mapping9[as.character(year)]) |> 
+  left_join(mod9_df, by = c("year", "st"))
+```
+
+#### A
+
+```{r, fig.width = 11}
+mod9_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+#### B
+
+```{r, fig.width = 11}
+mod9_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+```
+
+#### C
+
+```{r, fig.width = 11}
+mod9_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+```{r}
+# run in console
+# plot(mod9_postsamp, ask = TRUE)
+```
+
+### Plot trajectory of global AR(1)s {.tabset}
+
+#### AR1 - beta1
+
+```{r}
+mod9_beta1 <- gather_draws(mod9_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping9[as.character(i)])
+
+mod9_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1) - Beta 1") +
+  theme_minimal()
+```
+
+#### AR1 - beta2
+
+```{r}
+mod9_beta2 <- gather_draws(mod9_postsamp, beta2[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping9[as.character(i)])
+
+mod9_beta2 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1) - Beta 2") +
+  theme_minimal()
+```
+
+## 10: Mixture model with PCV-7
+
+(did not converge)
+
+### Create JAGS model object
+
+```{r, eval = FALSE}
+mod10 <- jags.model(textConnection(mod9_string),
+                   data = list("N_IPD" = mod1_mat,
+                               "N_years" = max(mod1_df$year_n),
+                               "N_sts" = ncol(mod1_mat)),
+                   inits = list(inits1, inits2, inits3),
+                   n.adapt = 10000,
+                   n.chains = 3)
+```
+
+### Sample posteriors {.tabset}
+
+```{r, eval = FALSE}
+mod10_postsamp <- coda.samples(mod10, params9, n.iter = 50000)
+
+# save(mod10_postsamp, file = "data/interim/mod10_postsamp.rda")
+```
+
+```{r}
+load("data/interim/mod10_postsamp.rda")
+
+beta_vars10 <- grep("^beta", varnames(mod10_postsamp), value = TRUE)
+```
+
+```{r, results = 'asis'}
+for (i in seq_along(beta_vars10)) {
+  cat(paste0("#### ",i," \n"))
+  traceplot(mod10_postsamp[, beta_vars10[i]])
+  cat("```\n")
+}
+```
+
+### AR1 groups
+
+```{r}
+groups10 <- gather_draws(mod10_postsamp, grp[j]) |> 
+  rename(st = j) |> 
+  mutate(st = st_mapping[as.character(st)])
+
+groups10_summary <- groups10 |> 
+  summarise(mean_grp = mean(.value))  |> 
+  mutate(assigned_group = ifelse(mean_grp > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
+
+groups10_summary |> 
+  group_by(assigned_group) |> 
+  summarise(serotypes = paste0(st, collapse = ", "))
+```
+
+### Plot obs vs pred {.tabset}
+
+```{r}
+mod10_summary <- gather_draws(mod10_postsamp, lambda[i,j]) |> 
+  median_hdi() |> 
+  rename(year = i,
+         st = j) |> 
+  mutate(st = st_mapping[as.character(st)],
+         year = year_mapping[as.character(year)]) |> 
+  left_join(mod1_df, by = c("year", "st"))
+```
+
+#### A
+
+```{r, fig.width = 11}
+mod10_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+#### B
+
+```{r, fig.width = 11}
+mod10_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st) +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal() +
+  coord_trans(y = "log1p")
+```
+
+#### C
+
+```{r, fig.width = 11}
+mod10_summary |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_point(aes(y = N_IPD, color = "Observed")) +
+  geom_line(aes(color = "Fitted")) +
+  facet_wrap(~st, scales = "free_y") +
+  labs(x = "", y = "# IPD", color = "") +
+  theme_minimal()
+```
+
+```{r}
+# run in console
+# plot(mod9_postsamp, ask = TRUE)
+```
+
+### Plot trajectory of global AR(1)s {.tabset}
+
+#### AR1 - beta1
+
+```{r}
+mod10_beta1 <- gather_draws(mod10_postsamp, beta1[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping[as.character(i)])
+
+mod10_beta1 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1) - Beta 1") +
+  theme_minimal()
+```
+
+#### AR1 - beta2
+
+```{r}
+mod10_beta2 <- gather_draws(mod10_postsamp, beta2[i]) |> 
+  median_hdi() |> 
+  mutate(year = year_mapping[as.character(i)])
+
+mod10_beta2 |> 
+  ggplot(aes(x = year, y = .value)) +
+  geom_ribbon(aes(x = year, ymin = .lower, ymax = .upper), alpha = 0.2) +
+  geom_line() +
+  labs(x = "", y = "Global AR(1) - Beta 2") +
+  theme_minimal()
 ```
