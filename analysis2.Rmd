@@ -12,7 +12,6 @@ output:
 ```{r setup, include = FALSE}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, rjags, tidybayes)
-
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
@@ -1029,9 +1028,10 @@ beta_vars8 <- grep("^beta", varnames(mod8_postsamp), value = TRUE)
 
 ```{r, results = 'asis'}
 for (i in seq_along(beta_vars8)) {
-  cat(paste0("#### ",i," \n"))
+  cat(paste0("\n#### ",i," \n"))
+  cat("\n")
   traceplot(mod8_postsamp[, beta_vars8[i]])
-  cat("```\n")
+  cat("\n")
 }
 ```
 
@@ -1233,9 +1233,10 @@ beta_vars9 <- grep("^beta", varnames(mod9_postsamp), value = TRUE)
 
 ```{r, results = 'asis'}
 for (i in seq_along(beta_vars9)) {
-  cat(paste0("#### ",i," \n"))
+  cat(paste0("\n#### ",i," \n"))
+  cat("\n")
   traceplot(mod9_postsamp[, beta_vars9[i]])
-  cat("```\n")
+  cat("\n")
 }
 ```
 
@@ -1379,9 +1380,10 @@ beta_vars10 <- grep("^beta", varnames(mod10_postsamp), value = TRUE)
 
 ```{r, results = 'asis'}
 for (i in seq_along(beta_vars10)) {
-  cat(paste0("#### ",i," \n"))
+  cat(paste0("\n#### ",i," \n"))
+  cat("\n")
   traceplot(mod10_postsamp[, beta_vars10[i]])
-  cat("```\n")
+  cat("\n")
 }
 ```
 
