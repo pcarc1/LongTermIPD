@@ -7,3 +7,6 @@
 /data/interim
 /mixture-models_cache
 /mixture-models_files
+/mixture-modelsv2_cache
+/mixture-modelsv2_files
+*.html

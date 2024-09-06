@@ -46,7 +46,7 @@ data <- data_raw |>
                               .default = ""))
 ```
 
-## Mixture model with PCV-13 -- uninformative delta
+## 1. Mixture model with PCV-13 -- uninformative delta
 
 ### Wrangle data
 
@@ -292,7 +292,7 @@ mod9_summary |>
   theme_minimal()
 ```
 
-## Mixture model with PCV-13 -- delta centered around 1
+## 2. Mixture model with PCV-13 -- delta centered around 1
 
 ### Define model string
 
@@ -508,7 +508,7 @@ mod10_summary |>
   theme_minimal()
 ```
 
-## Mixture model with PCV-13 -- delta centered around 1, simpler binary var
+## 3. Mixture model with PCV-13 -- delta centered around 1, simpler binary var
 
 ### Define model string
 
@@ -722,7 +722,7 @@ mod11_summary |>
   theme_minimal()
 ```
 
-## Mixture model with PCV-13 -- using delta[j] as serotype intercept
+## 4. Mixture model with PCV-13 -- using delta[j] as serotype intercept
 
 ### Define model string
 
@@ -836,6 +836,104 @@ for (i in seq_along(beta_vars12)) {
 }
 ```
 
+### Plot traces for alpha1 + beta1 + delta1 {.tabset}
+
+```{r}
+alpha1_samples <- mod12_postsamp[, "alpha1"]
+delta1_samples <- mod12_postsamp[, grep("^delta1\\[", varnames(mod12_postsamp), value = TRUE)]
+beta1_samples <- mod12_postsamp[, grep("^beta1\\[", varnames(mod12_postsamp), value = TRUE)]
+
+N_years <- ncol(beta1_samples[[1]])
+N_sts <- ncol(delta1_samples[[1]])
+
+combined_effect12a <- list()
+```
+
+```{r, results = 'asis'}
+for (i in 1:N_years) {
+  
+  cat(paste0("\n#### ", year_mapping9[i], " {.tabset}", "\n"))
+  cat("\n")
+  
+  for (j in 1:N_sts) {
+    for (chain in 1:3) { 
+      combined_effect12a[[chain]] <- alpha1_samples[[chain]] + delta1_samples[[chain]][, j] + beta1_samples[[chain]][, i]
+      }
+    
+    combined_mcmc12a <- mcmc.list(combined_effect12a)
+    
+    cat(paste0("\n##### ", st_mapping9[j]," \n"))
+    cat("\n")
+    traceplot(combined_mcmc12a, main = paste("Year", year_mapping9[i], "ST", st_mapping9[j]), 
+              xlab = "Iteration", ylab = "Combined Effect")
+    cat("\n")
+  }
+}
+```
+
+### Plot traces for alpha1 + beta2 + delta1 {.tabset}
+
+```{r}
+beta2_samples <- mod12_postsamp[, grep("^beta2\\[", varnames(mod12_postsamp), value = TRUE)]
+
+combined_effect12b <- list()
+```
+
+```{r, results = 'asis'}
+for (i in 1:N_years) {
+  
+  cat(paste0("\n#### ", year_mapping9[i], " {.tabset}", "\n"))
+  cat("\n")
+  
+  for (j in 1:N_sts) {
+    for (chain in 1:3) { 
+      combined_effect12b[[chain]] <- alpha1_samples[[chain]] + delta1_samples[[chain]][, j] + beta2_samples[[chain]][, i]
+      }
+    
+    combined_mcmc12b <- mcmc.list(combined_effect12b)
+    
+    cat(paste0("\n##### ", st_mapping9[j]," \n"))
+    cat("\n")
+    traceplot(combined_mcmc12b, main = paste("Year", year_mapping9[i], "ST", st_mapping9[j]), 
+              xlab = "Iteration", ylab = "Combined Effect")
+    cat("\n")
+  }
+}
+```
+
+### Plot traces for alpha1 + delta[j] + grp[j]\*(beta1[i] ) + (1-grp[j])\*(beta2[i] ) {.tabset}
+
+```{r}
+grp_samples <- mod12_postsamp[, grep("^grp\\[", varnames(mod12_postsamp), value = TRUE)]
+
+combined_effect12c <- list()
+```
+
+```{r, results = 'asis'}
+for (i in 1:N_years) {
+  
+  cat(paste0("\n#### ", year_mapping9[i], " {.tabset}", "\n"))
+  cat("\n")
+  
+  for (j in 1:N_sts) {
+    for (chain in 1:3) { 
+      combined_effect12c[[chain]] <- alpha1_samples[[chain]] + 
+        delta1_samples[[chain]][, j] + 
+        beta1_samples[[chain]][, i]*grp_samples[[chain]][, j] +
+        beta2_samples[[chain]][, j]*(1-grp_samples[[chain]][, j])
+      }
+    
+    combined_mcmc12c <- mcmc.list(combined_effect12c)
+    
+    cat(paste0("\n##### ", st_mapping9[j]," \n"))
+    cat("\n")
+    traceplot(combined_mcmc12c, main = paste("Year", year_mapping9[i], "ST", st_mapping9[j]), 
+              xlab = "Iteration", ylab = "Combined Effect")
+    cat("\n")
+  }
+}
+```
+
 ### Show and plot AR1 groups
 
 ```{r}
@@ -939,7 +1037,7 @@ mod12_summary |>
   theme_minimal()
 ```
 
-## Mixture model with PCV-13 -- removing epsilon to force clustering
+## 5. Mixture model with PCV-13 -- removing epsilon to force clustering
 
 ### Define model string
 
