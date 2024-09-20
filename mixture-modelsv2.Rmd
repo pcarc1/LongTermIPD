@@ -288,7 +288,7 @@ groups12 <- gather_draws(mod12_postsamp, grp[j]) |>
   median_hdci() |> 
   rename(st = j) |> 
   mutate(st = st_mapping9[as.character(st)],
-         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta 2)"))
+         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
 
 groups12 |> 
   group_by(group) |> 
@@ -595,7 +595,7 @@ groups13 <- gather_draws(mod13_postsamp, grp[j]) |>
   median_hdci() |> 
   rename(st = j) |> 
   mutate(st = st_mapping9[as.character(st)],
-         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta 2)"))
+         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
 
 groups13 |> 
   group_by(group) |> 
@@ -877,7 +877,7 @@ simulated_data <- pre_simulated_data |>
 simulated_data |> 
   dplyr::select(group, st) |> 
   distinct() |> 
-  mutate(group = if_else(group < 0.5, "Group 1 (beta1)", "Group 2 (beta 2)")) |> 
+  mutate(group = if_else(group < 0.5, "Group 1 (beta1)", "Group 2 (beta2)")) |> 
   group_by(group) |> 
   summarise(serotypes = paste0(st, collapse = " ,"))
 
@@ -1055,7 +1055,7 @@ groups14 <- gather_draws(mod14_postsamp, grp[j]) |>
   median_hdci() |> 
   rename(st = j) |> 
   mutate(st = as.numeric(st_mapping14[as.character(st)]),
-         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta 2)"))
+         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
 
 simulated_data |> 
   dplyr::select(group, st) |> 
@@ -1604,7 +1604,7 @@ groups16 <- gather_draws(mod16_postsamp, grp[j]) |>
   median_hdci() |> 
   rename(st = j) |> 
   mutate(st = as.numeric(st_mapping14[as.character(st)]),
-         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta 2)"))
+         group = if_else(.value > 0.5, "Group 1 (beta1)", "Group 2 (beta2)"))
 
 simulated_data2 |> 
   dplyr::select(group, st) |> 
