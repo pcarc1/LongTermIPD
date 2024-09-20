@@ -489,7 +489,6 @@ for (i in seq_along(beta_vars13)) {
 }
 ```
 
-
 ### Plot traces for alpha1 + beta1 + delta1 {.tabset}
 
 ```{r, echo = FALSE}
@@ -1612,7 +1611,7 @@ simulated_data2 |>
   mutate(group = if_else(group < 0.5, "Group 1 (beta1)", "Group 2 (beta2)")) |> 
   group_by(group) |> 
   summarise(original_assignment = paste0(st, collapse = ", ")) |> 
-  left_join(groups14 |> 
+  left_join(groups16 |> 
   group_by(group) |> 
   summarise(model_assignment = paste0(st, collapse = ", ")), by = "group")
 
@@ -2243,6 +2242,7 @@ groups15 |>
   summarise(sts = paste0(st, collapse = ", "))
 
 groups15 |> 
+  filter(.value >= 0) |> 
   ggplot(aes(x = st)) +
   geom_pointrange(aes(y = .value, ymin = .lower, ymax = .upper)) +
   facet_wrap(~.variable) +
