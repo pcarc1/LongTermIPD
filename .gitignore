@@ -10,3 +10,9 @@
 /mixture-modelsv2_cache
 /mixture-modelsv2_files
 *.html
+/dtw-cluster_cache
+/dtw-cluster_files
+/sim-abridged_cache
+/sim-abridged_files
+/sim_cache
+/sim_files

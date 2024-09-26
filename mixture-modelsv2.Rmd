@@ -819,7 +819,7 @@ for(j in 1:N_sts){
   epsilon1[1,j] <- rnorm(1, 0, (1 - rho_eps^2) * tau_eps)
   
   for(i in 2:N_years){
-    epsilon1[i,j] <- rnorm(1, 0, tau_eps)
+    epsilon1[i,j] <- rnorm(1, rho_eps * epsilon1[i-1, j], tau_eps)
   }
 }
 
