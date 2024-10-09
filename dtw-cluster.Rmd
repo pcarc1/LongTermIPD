@@ -41,12 +41,8 @@ data <- data_raw |>
                               pcv13 == 1 ~ "pcv13",
                               pcv15 == 1 ~ "pcv15",
                               pcv20 == 1 ~ "pcv20",
-                              .default = ""))
-```
-
-```{r}
-pcv13 <- data |> 
-  filter(pcv13 == 1) |> 
+                              .default = "")) |> 
+  filter(st != "MISS" & st != "NT") |> 
   arrange(year) |> 
   group_by(st) |> 
   mutate(nyear = row_number()) |> 
@@ -54,11 +50,6 @@ pcv13 <- data |>
   dplyr::select(st, N_IPD, nyear) |> 
   nest(.by = "st") |> 
   deframe()
-
-# ts_data <- pcv13_norm |> 
-#   group_by(st) |> 
-#   summarise(N_IPDst = list(N_IPDst)) |> 
-#   pull(N_IPDst, name = st)
 ```
 
 ### Smooth with p-splines
@@ -66,24 +57,52 @@ pcv13 <- data |>
 ```{r}
 gmods <- list()
 
-for (i in names(pcv13)) {
-  gmods[[i]] <- gam(N_IPD ~ s(x = nyear, bs = "ps", k = 25),
-                      family = poisson,
-                      method = "REML",
-                      control = list(maxit = 100000),
-                      data = pcv13[[i]])
+for (i in names(data)) {
+  gmods[[i]] <- tryCatch(
+    {
+      list(
+        model = gam(N_IPD ~ s(x = nyear, bs = "ps", k = 25),
+                    family = poisson,
+                    method = "REML",
+                    control = list(maxit = 100000),
+                    data = data[[i]]),
+        success = 1
+      )
+    },
+    warning = function(w) {
+      list(
+        model = gam(N_IPD ~ s(x = nyear, bs = "ps", k = 25),
+                    family = poisson,
+                    method = "REML",
+                    control = list(maxit = 100000),
+                    data = data[[i]]),
+        success = 0
+      )
+    }
+  )
 }
 
-smooth_pcv13 <- list()
+smooth_data <- list()
 
-for (i in names(pcv13)){
-  smooth_pcv13[[i]] = data.frame(fitcases = gmods[[i]]$fitted.values) %>% 
-    dplyr::mutate(nyear = seq.int(from = 1, by = 1, length.out = n()))
+for (i in names(data)){
+  smooth_data[[i]] = data.frame(fitcases = gmods[[i]]$model$fitted.values) %>% 
+    dplyr::mutate(nyear = seq.int(from = 1, by = 1, length.out = n()),
+                  success = gmods[[i]]$success)
 }
 
-ts_data <- smooth_pcv13 |>
+smooth_data |> 
   enframe() |> 
   unnest(cols = c(value)) |> 
+  select(name, success) |> 
+  distinct() |> 
+  filter(success == 0)
+
+# No gam convergence for 12B, 15D, 16A, 18, 19B, 19C, 25F, 33B, 35, 41A, 43, 45, 47F
+
+ts_data <- smooth_data |>
+  enframe() |> 
+  unnest(cols = c(value)) |> 
+  filter(success == 1) |> 
   group_by(name) |> 
   summarise(fitcases = list(fitcases)) |> 
   pull(fitcases, name = name)
@@ -92,30 +111,35 @@ ts_labels <- tibble(name = names(ts_data),
                     group = 1:length(ts_data))
 ```
 
+### Determine window and cluster size
+
 ```{r, echo = FALSE, eval = FALSE}
-# DTW cluster evaluation to determine window size
-cfg <- compare_clusterings_configs(
-  types = "hierarchical",
-  k = 2L:25L,
-  controls = list(hierarchical = hierarchical_control(method = "average")),
-  distances = pdc_configs("distance", hierarchical = list(dtw = list(window.size = seq(from = 1L, to = 100L, by = 1L), norm = c("L1")))),
-  centroids = pdc_configs("centroid", hierarchical = list(dba = list(window.size = seq(from = 1L, to = 100L, by = 1L), norm = c("L1")))),
-  preprocs = pdc_configs("preproc", hierarchical = list(zscore = list(window.size = seq(from = 1L, to = 100L, by = 1L), norm = c("L1")))),
+cfg <- dtwclust::compare_clusterings_configs(
+  types = "hierarchical", 
+  k = 2L:71L, 
+  controls = list(hierarchical = hierarchical_control(method = "average")), 
+  distances = pdc_configs("distance", hierarchical = list(dtw = list(window.size = seq(from = 1L, to = 25L, by = 1L), norm = c("L1")))),
+  centroids = pdc_configs("centroid", hierarchical = list(dba = list(window.size = seq(from = 1L, to = 25L, by = 1L), norm = c("L1")))),
+  preprocs = pdc_configs("preproc", hierarchical = list(zscore = list(window.size = seq(from = 1L, to = 25L, by = 1L), norm = c("L1")))),
   no.expand = c("window.size", "norm" ))
 
 evaluators <- cvi_evaluators(c("DBstar"))
 
-# comparison <- compare_clusterings(Dshc, 
-#                                   types = "hierarchical", 
-#                                   configs = cfg, 
-#                                   seed = 8L, 
-#                                   score.clus = evaluators$score, 
-#                                   pick.clus = evaluators$pick)
+comparison <- compare_clusterings(ts_data, 
+                                  types = "hierarchical", 
+                                  configs = cfg, 
+                                  seed = 8L, 
+                                  score.clus = evaluators$score, 
+                                  pick.clus = evaluators$pick)
+
+result <- comparison$results$hierarchical |> 
+  arrange(DBstar)
+
 ```
 
 ### DTW clustering - 2 clusters 
 
-```{r}
+```{r, fig.width = 15, fig.height = 7}
 dtw_hc <- dtwclust::tsclust(ts_data,
                             type = "hierarchical",
                             k = 2,
@@ -218,7 +242,7 @@ ggdendro::ggdendrogram(dtw_hc3) +
 
 ### DTW clustering - 5 clusters
 
-```{r}
+```{r, fig.width = 17, fig.height = 7}
 dtw_hc5 <- dtwclust::tsclust(ts_data,
                             type = "hierarchical",
                             k = 5,
@@ -252,7 +276,7 @@ ggdendro::ggdendrogram(dtw_hc5) +
 
 ### DTW clustering - 10 clusters
 
-```{r}
+```{r, fig.width = 17, fig.height = 7}
 dtw_hc10 <- dtwclust::tsclust(ts_data,
                             type = "hierarchical",
                             k = 10,
