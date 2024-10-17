@@ -1,5 +1,5 @@
 ---
-title: "19F"
+title: "19F in Germany"
 author: "Paloma Cárcamo"
 output: html_document
 ---
@@ -10,137 +10,6 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, sf, spdep, INLA, cowplot)
 ```
 
-## IPD cases 2017-2018 / IPD cases circa introduction of PCV-13
-
-```{r}
-us_raw <- read_rds("data/ABCs_st_1998_2021.rds")
-
-us <- us_raw |> 
-  rename(agec = "Age.Group..years.",
-         year = Year,
-         st = IPD.Serotype,
-         N_IPD = Frequency.Count)  |> 
-  mutate(st = if_else(st == '16', '16F', st))  |> 
-  group_by(st, year) |> 
-  summarize(N_IPD = sum(N_IPD)) |> 
-  group_by(year) |> 
-  mutate(IPD_total = sum(N_IPD)) |> 
-  ungroup() |> 
-  filter(st == "19F") |> 
-  rename(IPD_19F = N_IPD) |> 
-  mutate(country = "United States",
-         prop_19F = IPD_19F/IPD_total) |> 
-  dplyr::select(country, year, IPD_19F, IPD_total, prop_19F)
-
-aus_raw <- readxl::read_xlsx("data/aus_ipd.xlsx", skip = 1)
-
-aus <- aus_raw |> 
-  rename(year = Year,
-         st = Serotype)  |> 
-  group_by(year, st) |> 
-  summarise(N_IPD = n()) |> 
-  group_by(year) |> 
-  mutate(IPD_total = sum(N_IPD)) |> 
-  ungroup() |> 
-  filter(st == "19F") |> 
-  rename(IPD_19F = N_IPD) |> 
-  mutate(country = "Australia",
-         prop_19F = IPD_19F/IPD_total) |> 
-  dplyr::select(country, year, IPD_19F, IPD_total, prop_19F)
-
-eur_raw <- read_csv("data/ecdc_processed.csv", col_select = -1)
-
-eur <- eur_raw |> 
-  group_by(country, year, st) |> 
-  summarise(N_IPD = sum(total_cases, na.rm = TRUE))|> 
-  group_by(country, year) |> 
-  mutate(IPD_total = sum(N_IPD)) |> 
-  ungroup() |> 
-  filter(st == "19F") |> 
-  dplyr::select(-st) |> 
-  rename(IPD_19F = N_IPD) |> 
-  mutate(prop_19F = IPD_19F/IPD_total)
-
-ger_ipd_raw <- read_csv("data/DE_IPD_deidentified.csv")
-
-ger <- ger_ipd_raw |> 
-  mutate(date = as.Date(DateOfIsolation, format = "%d/%m/%Y"),
-         year = year(date)) |>
-  rename(st = Serotype) |> 
-  group_by(year, st) |> 
-  summarise(N_IPD = n()) |> 
-  group_by(year) |> 
-  mutate(IPD_total = sum(N_IPD)) |> 
-  ungroup() |> 
-  filter(st == "19F") |> 
-  rename(IPD_19F = N_IPD) |> 
-  mutate(country = "Germany",
-         prop_19F = IPD_19F/IPD_total) |> 
-  dplyr::select(country, year, IPD_19F, IPD_total, prop_19F)
-
-db_19F <- us |> 
-  rbind(aus) |> 
-  rbind(eur) |> 
-  rbind(ger)
-```
-
-```{r}
-vax_years <- read_csv("data/vax-intro-years.csv") |> 
-  mutate(label = factor(label, levels = c("PCV7", "PCV10", "PCV13")))
-
-db_19F |> 
-  filter(year >= 2010) |> 
-  ggplot(aes(x = year, y = IPD_19F, color = country)) +
-  geom_line(lwd = 1) +
-  scale_x_continuous(breaks = c(2010:2022)) +
-  labs(x = "", y = "19F IPD cases", color = "") +
-  theme_bw()
-
-db_19F |> 
-  ggplot(aes(x = year, y = IPD_19F)) +
-  geom_vline(data = vax_years, aes(xintercept = year, color = label), lty = 2) +
-  scale_color_manual(values = c("PCV7" = "black", "PCV10" = "blue", "PCV13" = "red"), name = "") +
-  ggnewscale::new_scale_color() +
-  geom_line(aes(color = country), lwd = 1, show.legend = FALSE) +
-  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
-  facet_wrap(~country, scales = "free_y") +
-  labs(x = "", y = "19F IPD cases", color = "") +
-  theme_bw()
-
-db_19F |> 
-  filter(year >= 2010) |> 
-  ggplot(aes(x = year, y = prop_19F, color = country)) +
-  geom_line(lwd = 1) +
-  scale_x_continuous(breaks = c(2010:2022)) +
-  labs(x = "", y = "19F IPD cases/total IPD cases", color = "") +
-  theme_bw()
-
-db_19F |> 
-  ggplot(aes(x = year, y = prop_19F)) +
-  geom_vline(data = vax_years, aes(xintercept = year, color = label), lty = 2) +
-  scale_color_manual(values = c("PCV7" = "black", "PCV10" = "blue", "PCV13" = "red"), name = "") +
-  ggnewscale::new_scale_color() +
-  geom_line(aes(color = country), lwd = 1, show.legend = FALSE) +
-  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
-  facet_wrap(~country, scales = "free_y") +
-  labs(x = "", y = "19F IPD cases/total IPD cases", color = "") +
-  theme_bw()
-```
-
-
-```{r}
-data_19F <- read_csv("data/data_19F.csv") |> 
-  mutate(ratio = N_IPD_comp/N_IPD_base,
-         schedule = factor(schedule),
-         vax = factor(case_when(!is.na(year_pcv10) & !is.na(year_pcv13) ~ "both",
-                                !is.na(year_pcv10) ~ "pcv10",
-                                !is.na(year_pcv13) ~ "pcv13"))) |> 
-  rowwise() |> 
-  mutate(mean_cov = mean(c(coverage_2011, coverage_2012, coverage_2013, coverage_2014, coverage_2015, coverage_2016, coverage_2017, coverage_2018), na.rm = TRUE))
-```
-
-## Germany
-
 ### 3-digit zipcode
 
 Missing zipcode: 5685/39315
@@ -148,6 +17,8 @@ Missing zipcode: 5685/39315
 Shapefiles from: https://www.suche-postleitzahl.org/downloads
 
 ```{r}
+ger_ipd_raw <- read_csv("data/DE_IPD_deidentified.csv")
+
 ger_ipd <- ger_ipd_raw |> 
   mutate(date = as.Date(DateOfIsolation, format = "%d/%m/%Y")) |> 
   filter(!is.na(PLZpatient) & date > as.Date("2009-01-01")) |> 
