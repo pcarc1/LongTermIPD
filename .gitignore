@@ -18,3 +18,5 @@
 /sim_files
 /dtw-cluster-comp_cache
 /dtw-cluster-comp_files
+/data
+*.adj

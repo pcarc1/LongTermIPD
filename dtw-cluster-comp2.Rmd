@@ -1028,13 +1028,13 @@ eur <- eur_raw |>
 eur |> 
   ggplot(aes(x = year, y = N_IPD, color = country)) +
   geom_line() +
-  facet_wrap(~st) +
+  facet_wrap(~st, scales = "free_y") +
   theme_bw()
 
 eur |> 
   ggplot(aes(x = year, y = N_IPD, color = st)) +
   geom_line() +
-  facet_wrap(~country) +
+  facet_wrap(~country, scales = "free_y") +
   theme_bw()
 ```
 
