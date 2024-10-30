@@ -11,7 +11,7 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, reactable)
 ```
 
-```{r, include = FALSE}
+```{r, message = FALSE}
 us_raw <- read_rds("data/ABCs_st_1998_2021.rds")
 
 us <- us_raw |> 
@@ -86,30 +86,27 @@ db_19F_wide <- db_19F |>
   filter(year >= 2010 & year < 2020) |> 
   dplyr::select(-IPD_total) |> 
   pivot_wider(names_from = year, values_from = c(IPD_19F, prop_19F)) |> 
-  mutate(baseline = case_when(!is.na(IPD_19F_2010) ~ IPD_19F_2010, 
-                              !is.na(IPD_19F_2011) ~ IPD_19F_2011,
-                              !is.na(IPD_19F_2012) ~ IPD_19F_2012),
-         baseline_prop = case_when(!is.na(prop_19F_2010) ~ prop_19F_2010,
-                                   !is.na(prop_19F_2011) ~ prop_19F_2011,
-                                   !is.na(prop_19F_2012) ~ prop_19F_2012)) |> 
   rowwise() |> 
-  mutate(comparison = if_else(!is.na(IPD_19F_2017), mean(IPD_19F_2017, IPD_19F_2018, IPD_19F_2019, na.rm = TRUE), IPD_19F_2014),
-         comparison_prop = if_else(!is.na(prop_19F_2017), mean(prop_19F_2017, prop_19F_2018, prop_19F_2019, na.rm = TRUE), prop_19F_2014),
-         ratio_cases = baseline/comparison,
-         ratio_prop = baseline_prop/comparison_prop) |> 
+  mutate(baseline = mean(c(IPD_19F_2010, IPD_19F_2011, IPD_19F_2012), na.rm = TRUE),
+         baseline_prop = mean(c(prop_19F_2010, prop_19F_2011, prop_19F_2012), na.rm = TRUE),
+         comparison = if_else(!is.na(IPD_19F_2017), mean(c(IPD_19F_2017, IPD_19F_2018, IPD_19F_2019), na.rm = TRUE), IPD_19F_2014),
+         comparison_prop = if_else(!is.na(prop_19F_2017), mean(c(prop_19F_2017, prop_19F_2018, prop_19F_2019), na.rm = TRUE), prop_19F_2014),
+         ratio_cases = comparison/baseline,
+         ratio_prop = comparison_prop/baseline_prop) |> 
   ungroup()
 
 data_19F <- read_csv("data/data_19F.csv") |> 
   left_join(db_19F_wide, by = "country")
 ```
 
-```{r, echo = FALSE}
+```{r}
 reactable(data_19F |> 
-            dplyr::select(country, year_pcv7, year_pcv10, year_pcv13, schedule, time_secondvax, mean_cov, baseline, baseline_prop, comparison, comparison_prop, ratio_cases, ratio_prop),
+            dplyr::select(country, year_pcv7, year_pcv10, year_pcv13, vax_type, schedule, time_secondvax, mean_cov, baseline, baseline_prop, comparison, comparison_prop, ratio_cases, ratio_prop),
           columns = list(country = colDef(name = "Country"),
                          year_pcv7 = colDef(name = "PCV7 introduction"),
                          year_pcv10 = colDef(name = "PCV10 introduction"),
                          year_pcv13 = colDef(name = "PCV13 introduction"),
+                         vax_type = colDef(name = "Most used vaccine in F/U period"),
                          schedule = colDef(name = "Vaccine schedule"),
                          time_secondvax = colDef(name = "Years between PCV7 and PCV10/13"),
                          mean_cov = colDef(name = "Vaccine coverage"),
@@ -121,7 +118,7 @@ reactable(data_19F |>
                          ratio_prop = colDef(name = "Ratio of proportions", format = colFormat(digits = 2))), defaultPageSize = 14)
 ```
 
-```{r, fig.width = 10, fig.height = 5, echo = FALSE, message = FALSE}
+```{r, fig.width = 10, fig.height = 5, message = FALSE}
 vax_years <- read_csv("data/vax-intro-years.csv") |> 
   mutate(label = factor(label, levels = c("PCV7", "PCV10", "PCV13")))
 
@@ -169,41 +166,41 @@ db_19F |>
 ```{r}
 # Ratio of cases
 # PCV10 vs PCV13 vs both: not significant
-summary(lm(ratio_cases ~ vax_type, data = data_19F))
+summary(lm(log(ratio_cases) ~ vax_type, data = data_19F))
 
 # Ratio of proportions
 # PCV10 vs PCV13 vs both: not significant
-summary(lm(ratio_prop ~ vax_type, data = data_19F))
+summary(lm(log(ratio_prop) ~ vax_type, data = data_19F))
 
 # Ratio of cases
-# Years between PCV7 and PCV10/13: not significant
-summary(lm(ratio_cases ~ time_secondvax, data = data_19F))
+# Years between PCV7 and PCV10/13: significant, 0.15948
+summary(lm(log(ratio_cases) ~ time_secondvax, data = data_19F))
 
 # Ratio of proportions
-# Years between PCV7 and PCV10/13: significant, -0.12
-summary(lm(ratio_prop ~ time_secondvax, data = data_19F))
+# Years between PCV7 and PCV10/13: significant, 0.16983
+summary(lm(log(ratio_prop) ~ time_secondvax, data = data_19F))
 
 # Ratio of cases
 # Mean vaccine coverage: not significant
-summary(lm(ratio_cases ~ mean_cov, data = data_19F))
+summary(lm(log(ratio_cases) ~ mean_cov, data = data_19F))
 
 # Ratio of proportions
 # Mean vaccine coverage: not significant
-summary(lm(ratio_prop ~ mean_cov, data = data_19F))
+summary(lm(log(ratio_prop) ~ mean_cov, data = data_19F))
 
 # Ratio of cases
 # Vaccination schedule: not significant
-summary(lm(ratio_cases ~ schedule, data = data_19F))
+summary(lm(log(ratio_cases) ~ schedule, data = data_19F))
 
 # Ratio of proportions
 # Vaccination schedule: not significant
-summary(lm(ratio_prop ~ schedule, data = data_19F))
+summary(lm(log(ratio_prop) ~ schedule, data = data_19F))
 
 # Ratio of cases
 # None significant
-summary(lm(ratio_cases ~ vax_type + time_secondvax + mean_cov + schedule, data = data_19F))
+summary(lm(log(ratio_cases) ~ vax_type + time_secondvax + mean_cov + schedule, data = data_19F))
 
 # Ratio of proportions
 # None significant
-summary(lm(ratio_prop ~ vax_type + time_secondvax + mean_cov + schedule, data = data_19F))
+summary(lm(log(ratio_prop) ~ vax_type + time_secondvax + mean_cov + schedule, data = data_19F))
 ```

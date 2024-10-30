@@ -14,7 +14,9 @@ pacman::p_load(tidyverse, sf, spdep, INLA, cowplot)
 
 Missing zipcode: 5685/39315
 
-Shapefiles from: https://www.suche-postleitzahl.org/downloads
+Shapefiles from: https://www.suche-postleitzahl.org/downloads, GADM https://gadm.org/download_country.html
+
+Vaccination coverage estimates from Robert Kock Institut https://robert-koch-institut.github.io/Inanspruchnahme_von_Routineimpfungen_in_Deutschland-Ergebnisse_aus_der_KV-Impfsurveillance/
 
 ```{r}
 ger_ipd_raw <- read_csv("data/DE_IPD_deidentified.csv")
