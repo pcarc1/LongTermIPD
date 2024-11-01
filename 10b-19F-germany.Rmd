@@ -51,7 +51,7 @@ ger_key <- ger_key_raw |>
 ```{r}
 ger_covsf <- ger_shp |> 
   right_join(ger_cov, by = c("CC_2" = "county_ags")) |> 
-  filter(vaccine == "Pneumokokken")
+  filter(vaccine == "Pneumokokken" & age_group == "24 Monate")
 ```
 
 ```{r, fig.width = 14, fig.height = 10}
@@ -112,7 +112,7 @@ plz_ags_key <- read_rds("data/interim/plz_ags_key.rds")
 
 ```{r}
 ger_cov_agg <- ger_cov |> 
-  filter(vaccine == "Pneumokokken") |> 
+  filter(vaccine == "Pneumokokken" & age_group == "24 Monate") |> 
   left_join(plz_ags_key, by = c("county_ags" = "CC_2")) |> 
   mutate(new_pop = pop_weight*overlap_percentage,
          vaxed = new_pop*(vacc_rate/100)) |> 
