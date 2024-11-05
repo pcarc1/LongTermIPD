@@ -658,18 +658,19 @@ data_inla_plz2_delta <- list(
   total_cases = plz2_db_delta$ipd,
   N = plz2_db_delta$ipd,
   idarea = plz2_db_delta$idarea,
-  vacc_rate = plz2_db_delta$vacc_rate,
-  vacc_cat = plz2_db_delta$vacc_cat,
+  vacc_rate = plz2_db_delta$vacc_rate/100,
+  vacc_cat = plz2_db_delta$vacc_cat/100,
   nyeargroup = plz2_db_delta$nyeargroup,
-  vacc_rate_d = plz2_db_delta$vacc_rate_d,
-  vacc_cat_d = plz2_db_delta$vacc_cat_d
+  yeargroup = plz2_db_delta$yeargroup,
+  vacc_rate_d = plz2_db_delta$vacc_rate_d/100,
+  vacc_cat_d = plz2_db_delta$vacc_cat_d/100
 )
 ```
 
 ## Linear vaccine coverage delta
 
 ```{r}
-f9 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + f(nyeargroup, model = "rw2") + vacc_rate_d
+f9 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + yeargroup + vacc_rate_d
 
 result9 <- inla(
   f9, 
@@ -684,6 +685,7 @@ result9 <- inla(
 
 ```{r}
 summary(result9)
+exp(result9$summary.fixed)
 
 bym_st_result9 <- ger_shp_plz |> 
   cbind(result9$summary.random$idarea[1:95, ]) |> 
@@ -801,3 +803,135 @@ unstructured_result10 <- bym_st_result10 |>
 
 plot_grid(structured_result10, unstructured_result10, ncol = 2)
 ```
+
+## Separated by period
+
+```{r}
+plz2_db_delta1 <- plz2_db |> 
+  group_by(yeargroup) |> 
+  mutate(meancov = mean(vacc_rate, na.rm = TRUE)) |> 
+  ungroup() |> 
+  mutate(vacc_rate_d = vacc_rate - meancov,
+         vacc_cat_d = inla.group(vacc_rate_d, n = 10, method = "quantile")) |> 
+  filter(nyeargroup == 1)
+
+plz2_db_delta2 <- plz2_db |> 
+  group_by(yeargroup) |> 
+  mutate(meancov = mean(vacc_rate, na.rm = TRUE)) |> 
+  ungroup() |> 
+  mutate(vacc_rate_d = vacc_rate - meancov,
+         vacc_cat_d = inla.group(vacc_rate_d, n = 10, method = "quantile")) |> 
+  filter(nyeargroup == 2)
+
+plz2_db_delta3 <- plz2_db |> 
+  group_by(yeargroup) |> 
+  mutate(meancov = mean(vacc_rate, na.rm = TRUE)) |> 
+  ungroup() |> 
+  mutate(vacc_rate_d = vacc_rate - meancov,
+         vacc_cat_d = inla.group(vacc_rate_d, n = 10, method = "quantile")) |> 
+  filter(nyeargroup == 3)
+
+data_inla_plz2_delta1 <- list(
+  cases_19F = plz2_db_delta1$ipd_st,
+  total_cases = plz2_db_delta1$ipd,
+  N = plz2_db_delta1$ipd,
+  idarea = plz2_db_delta1$idarea,
+  vacc_rate = plz2_db_delta1$vacc_rate/100,
+  vacc_cat = plz2_db_delta1$vacc_cat/100,
+  nyeargroup = plz2_db_delta1$nyeargroup,
+  yeargroup = plz2_db_delta1$yeargroup,
+  vacc_rate_d = plz2_db_delta1$vacc_rate_d/100,
+  vacc_cat_d = plz2_db_delta1$vacc_cat_d/100
+)
+
+data_inla_plz2_delta2 <- list(
+  cases_19F = plz2_db_delta2$ipd_st,
+  total_cases = plz2_db_delta2$ipd,
+  N = plz2_db_delta2$ipd,
+  idarea = plz2_db_delta2$idarea,
+  vacc_rate = plz2_db_delta2$vacc_rate/100,
+  vacc_cat = plz2_db_delta2$vacc_cat/100,
+  nyeargroup = plz2_db_delta2$nyeargroup,
+  yeargroup = plz2_db_delta2$yeargroup,
+  vacc_rate_d = plz2_db_delta2$vacc_rate_d/100,
+  vacc_cat_d = plz2_db_delta2$vacc_cat_d/100
+)
+
+data_inla_plz2_delta3 <- list(
+  cases_19F = plz2_db_delta3$ipd_st,
+  total_cases = plz2_db_delta3$ipd,
+  N = plz2_db_delta3$ipd,
+  idarea = plz2_db_delta3$idarea,
+  vacc_rate = plz2_db_delta3$vacc_rate/100,
+  vacc_cat = plz2_db_delta3$vacc_cat/100,
+  nyeargroup = plz2_db_delta3$nyeargroup,
+  yeargroup = plz2_db_delta3$yeargroup,
+  vacc_rate_d = plz2_db_delta3$vacc_rate_d/100,
+  vacc_cat_d = plz2_db_delta3$vacc_cat_d/100
+)
+```
+
+## Linear vaccine coverage delta
+
+```{r}
+f11 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + vacc_rate_d
+
+result11 <- inla(
+  f11, 
+  family = "binomial",
+  data = data_inla_plz2_delta1, 
+  Ntrials = data_inla_plz2_delta1$N, 
+  control.predictor = list(compute = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE),
+  verbose = TRUE
+)
+
+result12 <- inla(
+  f11, 
+  family = "binomial",
+  data = data_inla_plz2_delta2, 
+  Ntrials = data_inla_plz2_delta2$N, 
+  control.predictor = list(compute = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE),
+  verbose = TRUE
+)
+
+result13 <- inla(
+  f11, 
+  family = "binomial",
+  data = data_inla_plz2_delta3, 
+  Ntrials = data_inla_plz2_delta3$N, 
+  control.predictor = list(compute = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE),
+  verbose = TRUE
+)
+```
+
+```{r}
+summary(result11)
+summary(result12)
+summary(result13)
+
+exp(result11$summary.fixed)
+exp(result12$summary.fixed)
+exp(result13$summary.fixed)
+```
+
+## Check other vaccines
+
+```{r}
+check <- ger_cov |> 
+  distinct(vaccine, age_group)
+
+check2 <- ger_ipd_raw |> 
+  mutate(year = year(as.Date(DateOfIsolation, format = "%d/%m/%Y"))) |> 
+  group_by(year) |> 
+  summarise(cases = n())
+
+check3 <- ger_ipd_raw |> 
+  mutate(year = year(as.Date(DateOfIsolation, format = "%d/%m/%Y"))) |> 
+  filter(Serotype == "19F") |> 
+  group_by(year) |> 
+  summarise(cases = n())
+```
+
