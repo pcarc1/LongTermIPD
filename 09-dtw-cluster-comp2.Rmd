@@ -50,6 +50,27 @@ us <- us_raw |>
   dplyr::select(st, N_IPD, nyear) |> 
   nest(.by = "st") |> 
   deframe()
+
+us2 <- us_raw |> 
+  rename(agec = "Age.Group..years.",
+         year = Year,
+         st = IPD.Serotype,
+         N_IPD = Frequency.Count)  |> 
+  mutate(st = if_else(st == '16', '16F', st))  |> 
+  group_by(st, year) |> 
+  summarize(N_IPD = sum(N_IPD))  |> 
+  ungroup() |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  filter(st != "MISS" & st != "NT") |> 
+  arrange(year) |> 
+  group_by(st) |> 
+  mutate(nyear = row_number(),
+         tot_cases = sum(N_IPD)) |> 
+  ungroup() |> 
+  filter(tot_cases > 50) |> 
+  dplyr::select(st, N_IPD, year) |> 
+  nest(.by = "st") |> 
+  deframe()
 ```
 
 ### Smooth with p-splines
@@ -113,15 +134,22 @@ tslabels_us <- tibble(name = names(ts_us),
 ```
 
 ```{r, echo = FALSE, fig.width = 12, fig.height = 7}
-us |> 
+us2 |> 
   enframe() |> 
   unnest(cols = c(value)) |> 
-  left_join(smooth_us |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
-  ggplot(aes(x = nyear, y = N_IPD)) +
+  filter(year >= 2010) |> 
+  #left_join(smooth_us |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
+  ggplot(aes(x = as.integer(year), y = N_IPD)) +
+  geom_vline(aes(xintercept = 2010, color = "PCV13 introduced"), lty = 2) +
+  scale_color_manual(values = c("PCV13 introduced" = "red")) +
   geom_line() +
-  geom_line(aes(y = fitcases), color = "red") +
+  #geom_line(aes(y = fitcases), color = "red") +
   facet_wrap(~name, scales = "free_y") +
-  theme_bw()
+  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
+  labs(x = "", y = "IPD cases", color = "") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.93,0.07))
 ```
 
 ### DTW clustering {.tabset}
@@ -712,6 +740,24 @@ aus <- aus_raw |>
   dplyr::select(st, N_IPD, nyear) |> 
   nest(.by = "st") |> 
   deframe()
+
+aus2 <- aus_raw |> 
+  rename(year = Year,
+         st = Serotype)  |> 
+  group_by(year, st) |> 
+  summarise(N_IPD = n()) |> 
+  ungroup() |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  filter(!grepl("[ /]", st) & st != "UNTYPED") |> 
+  arrange(year) |> 
+  group_by(st) |> 
+  mutate(nyear = row_number(),
+         tot_cases = sum(N_IPD)) |> 
+  ungroup() |> 
+  filter(tot_cases > 50) |>
+  dplyr::select(st, N_IPD, year) |> 
+  nest(.by = "st") |> 
+  deframe()
 ```
 
 ### Smooth with p-splines
@@ -775,15 +821,21 @@ tslabels_aus <- tibble(name = names(ts_aus),
 ```
 
 ```{r, echo = FALSE, fig.width = 12, fig.height = 7}
-aus |> 
+aus2 |> 
   enframe() |> 
   unnest(cols = c(value)) |> 
-  left_join(smooth_aus |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
-  ggplot(aes(x = nyear, y = N_IPD)) +
+  #left_join(smooth_aus |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
+  ggplot(aes(x = as.integer(year), y = N_IPD)) +
+  geom_vline(aes(xintercept = 2011, color = "PCV13 introduced"), lty = 2) +
+  scale_color_manual(values = c("PCV13 introduced" = "red")) +
   geom_line() +
-  geom_line(aes(y = fitcases), color = "red") +
+  #geom_line(aes(y = fitcases), color = "red") +
   facet_wrap(~name, scales = "free_y") +
-  theme_bw()
+  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
+  labs(x = "", y = "IPD cases", color = "") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.93,0.07))
 ```
 
 ### DTW clustering {.tabset}
@@ -1059,6 +1111,23 @@ uk <- eur |>
   dplyr::select(st, N_IPD, nyear) |> 
   nest(.by = "st") |> 
   deframe()
+
+uk2 <- eur |> 
+  filter(country == "United Kingdom") |> 
+  select(-country) |> 
+  #complete(year, st, fill = list(N_IPD = 0)) |> 
+  filter(st != "NTYP") |> 
+  arrange(year) |> 
+  group_by(st) |> 
+  mutate(nyear = row_number(),
+         tot_cases = sum(N_IPD),
+         numb_year = length(unique(nyear))) |> 
+  ungroup() |> 
+  filter(tot_cases > 50,
+         numb_year == 9) |>
+  dplyr::select(st, N_IPD, year) |> 
+  nest(.by = "st") |> 
+  deframe()
 ```
 
 ### Smooth with p-splines
@@ -1124,16 +1193,22 @@ tslabels_uk <- tibble(name = names(ts_uk),
 ```
 
 ```{r, echo = FALSE, fig.width = 12, fig.height = 7}
-uk |> 
+uk2 |> 
   enframe() |> 
   unnest(cols = c(value)) |> 
   filter(N_IPD != 0) |> 
-  left_join(smooth_uk |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
-  ggplot(aes(x = nyear, y = N_IPD)) +
+  #left_join(smooth_uk |> enframe() |> unnest(cols = c(value)) |> filter(success == 1), by = c("name", "nyear")) |> 
+  ggplot(aes(x = as.integer(year), y = N_IPD)) +
+  geom_vline(aes(xintercept = 2010, color = "PCV13 introduced"), lty = 2) +
+  scale_color_manual(values = c("PCV13 introduced" = "red")) +
   geom_line() +
-  geom_line(aes(y = fitcases), color = "red") +
+  #geom_line(aes(y = fitcases), color = "red") +
   facet_wrap(~name, scales = "free_y") +
-  theme_bw()
+  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
+  labs(x = "", y = "IPD cases", color = "") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.93,0.07))
 ```
 
 ### DTW clustering {.tabset}
@@ -2436,4 +2511,123 @@ ggdendro::ggdendrogram(dtw_scand3) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
         legend.position = "bottom") + 
   geom_point(data = labs_scand3, aes(x = x, y = 0, color = Cluster, shape = Vaccine), size = 4)
+```
+
+## Germany
+
+PCV-13 introduced in 2009
+
+```{r, echo = FALSE}
+ger_raw <- read_csv("data/DE_IPD_deidentified.csv")
+
+ger <- ger_raw |> 
+  mutate(date = as.Date(DateOfIsolation, format = "%d/%m/%Y"),
+         year = year(date),
+         st = str_to_upper(Serotype),
+         st = case_when(st == "6B OLD" ~ "6B",
+                        st == "6A OLD" ~ "6A",
+                        st == "SEROGRUPPE 24" ~ "24",
+                        st == "SEROGRUPPE 35" ~ "35",
+                        .default = st)) |>  
+  filter(!is.na(st) & st != "NT" & st != "GRUPPE 35/42" & !is.na(date)) |> 
+  group_by(year, st) |> 
+  summarise(N_IPD = n()) |> 
+  ungroup() |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  arrange(year) |> 
+  group_by(st) |> 
+  mutate(nyear = row_number(),
+         tot_cases = sum(N_IPD)) |> 
+  ungroup() |> 
+  filter(tot_cases > 50) |>
+  dplyr::select(st, N_IPD, nyear) |> 
+  nest(.by = "st") |> 
+  deframe()
+
+ger2 <- ger_raw |> 
+  mutate(date = as.Date(DateOfIsolation, format = "%d/%m/%Y"),
+         year = year(date),
+         st = str_to_upper(Serotype),
+         st = case_when(st == "6B OLD" ~ "6B",
+                        st == "6A OLD" ~ "6A",
+                        st == "SEROGRUPPE 24" ~ "24",
+                        st == "SEROGRUPPE 35" ~ "35",
+                        .default = st)) |>  
+  filter(!is.na(st) & st != "NT" & st != "GRUPPE 35/42" & !is.na(date)) |> 
+  group_by(year, st) |> 
+  summarise(N_IPD = n()) |> 
+  ungroup() |> 
+  complete(year, st, fill = list(N_IPD = 0)) |> 
+  arrange(year) |> 
+  group_by(st) |> 
+  mutate(nyear = row_number(),
+         tot_cases = sum(N_IPD)) |> 
+  ungroup() |> 
+  filter(tot_cases > 50) |>
+  dplyr::select(st, N_IPD, year)
+```
+
+```{r, fig.width = 12, fig.height = 7}
+ger2 |> 
+  ggplot(aes(x = as.integer(year), y = N_IPD)) +
+  geom_vline(aes(xintercept = 2009, color = "PCV13 introduced"), lty = 2) +
+  scale_color_manual(values = c("PCV13 introduced" = "red")) +
+  geom_line() +
+  facet_wrap(~st, scales = "free_y") +
+  scale_x_continuous(breaks = c(2010, 2015, 2020)) +
+  labs(x = "", y = "IPD cases", color = "") +
+  theme_bw() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.93,0.07))
+```
+
+### DTW clustering
+
+#### raw, Z-score
+
+k = 5, window = 5
+
+```{r, echo = FALSE, fig.width = 12, fig.height = 7}
+ts_ger_raw <- ger |> 
+  enframe() |> 
+  unnest(cols = c(value)) |> 
+  group_by(name) |> 
+  summarise(N_IPD = list(N_IPD)) |> 
+  pull(N_IPD, name = name)
+
+tslabels_ger_raw <- tibble(name = names(ts_ger_raw),
+                          group = 1:length(ts_ger_raw))
+
+dtw_ger2 <- dtwclust::tsclust(ts_ger_raw,
+                            type = "hierarchical",
+                            k = 5,
+                            preproc = zscore,
+                            distance = "dtw_basic",
+                            control = hierarchical_control(method = "average"),
+                            trace = TRUE,
+                            args = tsclust_args(dist = list(window.size = 5), cent = dba))
+
+hc_members_ger2 <- as.data.frame((ggplot_build(plot(dtw_ger2, type = "series", clus = c(1:10)))[["data"]])) |> 
+  left_join(tslabels_ger_raw, by = "group")
+
+hc_centroid_ger2 <- as.data.frame((ggplot_build(plot(dtw_ger2, type = "centroids", clus = c(1:10), lty=1))[["data"]]))
+
+labs_ger2 <- label(dendro_data(as.dendrogram(dtw_ger2))) |> 
+  left_join(hc_members_ger2 |> dplyr::select(name, PANEL) |> distinct(), by = c("label" = "name")) |> 
+  rename(Cluster = PANEL) |> 
+  mutate(Vaccine = if_else(label %in% pcv7_st, "PCV-7", if_else(label%in% pcv13_stlab, "PCV-13", "NA")))
+
+ggplotly(hc_members_ger2 |> 
+  rename(panel2 = PANEL) |> 
+  ggplot() +
+  geom_line(aes(x = x, y = y, color = name), show.legend = FALSE) +
+  facet_wrap(~panel2) +
+  theme_bw())
+
+ggdendro::ggdendrogram(dtw_ger2) +
+  theme_bw(base_size = 18) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 2)) +
+  labs(x = "Time series hierarchical clustering", y = "Height") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+  geom_point(data = labs_ger2, aes(x = x, y = 0, color = Cluster, shape = Vaccine), size = 4)
 ```
