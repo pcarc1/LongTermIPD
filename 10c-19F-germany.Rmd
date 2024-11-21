@@ -189,7 +189,7 @@ plz2_db <- ger_shp_plz |>
   right_join(ger_ipd_plz2, by = c("plz" = "plz_2"))
 
 data_inla_plz2 <- list(
-  cases_19F = plz2_db$ipd_st,
+  cases_19F = plz2_db$ipd_19F,
   total_cases = plz2_db$ipd,
   N = plz2_db$ipd,
   idarea = plz2_db$idarea,
@@ -1310,7 +1310,9 @@ plz2_db3 <- ger_shp_plz |>
   st_drop_geometry() |> 
   ungroup() |> 
   mutate(idarea = row_number()) |> 
-  right_join(ger_ipd_19fa, by = c("plz" = "plz_2"))
+  right_join(ger_ipd_19fa, by = c("plz" = "plz_2")) |> 
+  mutate(cat_19a = inla.group(ratio_19A, n = 10, method = "quantile")) |> 
+  filter(!is.na(cat_19a))
 
 data3 <- list(
   cases_19F = plz2_db3$ipd_19F,
@@ -1320,12 +1322,13 @@ data3 <- list(
   vacc_rate = plz2_db3$vacc_rate,
   vacc_cat = plz2_db3$vacc_cat,
   nyeargroup = plz2_db3$nyeargroup,
-  ratio_19A = plz2_db3$ratio_19A
+  ratio_19A = plz2_db3$ratio_19A,
+  ratio_19Acat = plz2_db3$cat_19a
 )
 ```
 
 ```{r}
-f14 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + f(nyeargroup, model = "rw2") + ratio_19A
+f14 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + f(nyeargroup, model = "ar1") + ratio_19A
 
 result14 <- inla(
   f14, 
@@ -1338,5 +1341,41 @@ result14 <- inla(
 )
 
 summary(result14)
+
+exp(result14$summary.fixed)
+```
+
+```{r}
+extraconstr5 <- list(
+  A = matrix(0, nrow = 1, ncol = length(unique((plz2_db3$cat_19a)))),
+  e = 0
+)
+
+extraconstr5$A[1, 1] <- 1
+
+f15 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + f(nyeargroup, model = "ar1") + f(ratio_19Acat, model = "rw2", constr = FALSE, extraconstr = extraconstr5)
+
+result15 <- inla(
+  f15, 
+  family = "binomial",
+  data = data3, 
+  Ntrials = data3$N, 
+  control.predictor = list(compute = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE),
+  verbose = TRUE
+)
+
+summary(result15)
+
+vacc_result15 <- result15$summary.random$ratio_19Acat
+
+vacc_result15 |> 
+  ggplot(aes(x = ID)) +
+  geom_errorbar(aes(ymin = exp(`0.025quant`), ymax = exp(`0.975quant`))) +
+  geom_point(aes(y = exp(mean))) +
+  labs(x = "19A proportion", y = "Effect") +
+  #scale_x_continuous(n.breaks = 6) +
+  scale_y_continuous(breaks = c(0.5, 0.75, 1, 1.25, 1.5)) +
+  theme_bw()
 ```
 
