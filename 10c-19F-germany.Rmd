@@ -1311,7 +1311,8 @@ plz2_db3 <- ger_shp_plz |>
   ungroup() |> 
   mutate(idarea = row_number()) |> 
   right_join(ger_ipd_19fa, by = c("plz" = "plz_2")) |> 
-  mutate(cat_19a = inla.group(ratio_19A, n = 10, method = "quantile")) |> 
+  mutate(cat_19a = inla.group(ratio_19A, n = 10, method = "quantile"),
+         cat_19a2 = inla.group(ratio_19A, n = 5, method = "quantile")) |> 
   filter(!is.na(cat_19a))
 
 data3 <- list(
@@ -1323,7 +1324,8 @@ data3 <- list(
   vacc_cat = plz2_db3$vacc_cat,
   nyeargroup = plz2_db3$nyeargroup,
   ratio_19A = plz2_db3$ratio_19A,
-  ratio_19Acat = plz2_db3$cat_19a
+  ratio_19Acat = plz2_db3$cat_19a,
+  ratio_19Acat2 = plz2_db3$cat_19a2
 )
 ```
 
@@ -1376,6 +1378,148 @@ vacc_result15 |>
   labs(x = "19A proportion", y = "Effect") +
   #scale_x_continuous(n.breaks = 6) +
   scale_y_continuous(breaks = c(0.5, 0.75, 1, 1.25, 1.5)) +
+  theme_bw()
+
+bym_st_result15 <- ger_shp_plz |> 
+  cbind(result15$summary.random$idarea[1:95, ]) |> 
+  mutate(sig = case_when(X0.025quant > 0 & X0.975quant > 0 ~ 1,
+                         X0.025quant > 0 & X0.975quant < 0 ~ 1,
+                         .default = 0))
+
+bym_unst_result15 <- ger_shp_plz |> 
+  cbind(result15$summary.random$idarea[96:190, ]) |> 
+  mutate(sig = case_when(X0.025quant > 0 & X0.975quant > 0 ~ 1,
+                         X0.025quant > 0 & X0.975quant < 0 ~ 1,
+                         .default = 0))
+
+ar1_result15 <- result15$summary.random$nyeargroup |> 
+  left_join(plz2_db3 |> dplyr::select(nyeargroup, yeargroup) |> distinct(), by = c("ID" = "nyeargroup")) |> 
+  rename(lb = `0.025quant`, ub = `0.975quant`)
+
+ar1_result15 |> 
+  ggplot(aes(x = yeargroup, color = yeargroup)) +
+  geom_errorbar(aes(ymin = exp(lb), ymax = exp(ub)), show.legend = FALSE) +
+  geom_point(aes(y = exp(mean)), show.legend = FALSE) +
+  theme_bw() +
+  labs(x = "", y = "Effect")
+
+structured_result15 <- bym_st_result15 |> 
+  ggplot() +
+  geom_sf(aes(fill = exp(mean)), color = NA) +
+  scale_fill_viridis_c() +
+  labs(title = "Structured effects", fill = "Effect") +
+  theme_void()
+
+unstructured_result15 <- bym_st_result15 |> 
+  ggplot() +
+  geom_sf(aes(fill = exp(mean)), color = NA) +
+  scale_fill_viridis_c() +
+  labs(title = "Unstructured effects", fill = "Effect") +
+  theme_void()
+
+plot_grid(structured_result15, unstructured_result15, ncol = 2)
+```
+
+```{r}
+extraconstr6 <- list(
+  A = matrix(0, nrow = 1, ncol = length(unique((plz2_db3$cat_19a2)))),
+  e = 0
+)
+
+extraconstr6$A[1, 1] <- 1
+
+f16 <- cases_19F ~ 1 + f(idarea, model = "bym2", graph = g_plz2) + f(nyeargroup, model = "ar1") + f(ratio_19Acat2, model = "rw2", constr = FALSE, extraconstr = extraconstr6)
+
+result16 <- inla(
+  f16, 
+  family = "binomial",
+  data = data3, 
+  Ntrials = data3$N, 
+  control.predictor = list(compute = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE),
+  verbose = TRUE
+)
+
+summary(result16)
+
+vacc_result16 <- result16$summary.random$ratio_19Acat2
+
+vacc_result16 |> 
+  ggplot(aes(x = ID)) +
+  geom_errorbar(aes(ymin = exp(`0.025quant`), ymax = exp(`0.975quant`))) +
+  geom_point(aes(y = exp(mean))) +
+  labs(x = "19A proportion", y = "Effect") +
+  #scale_x_continuous(n.breaks = 6) +
+  scale_y_continuous(breaks = c(0.5, 0.75, 1, 1.25, 1.5)) +
+  theme_bw()
+
+bym_st_result16 <- ger_shp_plz |> 
+  cbind(result16$summary.random$idarea[1:95, ]) |> 
+  mutate(sig = case_when(X0.025quant > 0 & X0.975quant > 0 ~ 1,
+                         X0.025quant > 0 & X0.975quant < 0 ~ 1,
+                         .default = 0))
+
+bym_unst_result16 <- ger_shp_plz |> 
+  cbind(result16$summary.random$idarea[96:190, ]) |> 
+  mutate(sig = case_when(X0.025quant > 0 & X0.975quant > 0 ~ 1,
+                         X0.025quant > 0 & X0.975quant < 0 ~ 1,
+                         .default = 0))
+
+ar1_result16 <- result16$summary.random$nyeargroup |> 
+  left_join(plz2_db3 |> dplyr::select(nyeargroup, yeargroup) |> distinct(), by = c("ID" = "nyeargroup")) |> 
+  rename(lb = `0.025quant`, ub = `0.975quant`)
+
+ar1_result16 |> 
+  ggplot(aes(x = yeargroup, color = yeargroup)) +
+  geom_errorbar(aes(ymin = exp(lb), ymax = exp(ub)), show.legend = FALSE) +
+  geom_point(aes(y = exp(mean)), show.legend = FALSE) +
+  theme_bw() +
+  labs(x = "", y = "Effect")
+
+structured_result16 <- bym_st_result16 |> 
+  ggplot() +
+  geom_sf(aes(fill = exp(mean)), color = NA) +
+  scale_fill_viridis_c() +
+  labs(title = "Structured effects", fill = "Effect") +
+  theme_void()
+
+unstructured_result16 <- bym_st_result16 |> 
+  ggplot() +
+  geom_sf(aes(fill = exp(mean)), color = NA) +
+  scale_fill_viridis_c() +
+  labs(title = "Unstructured effects", fill = "Effect") +
+  theme_void()
+
+plot_grid(structured_result16, unstructured_result16, ncol = 2)
+```
+
+## Scatterplot 19A vs 19F
+
+```{r}
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = ratio_19A, y = ratio_19F, size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  theme_bw()
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = ratio_19A, y = ratio_19F, size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = ratio_19A, y = ratio_19F)) +
+  labs(size = "Total IPD cases") +
+  theme_bw()
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(ratio_19A), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  theme_bw()
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(ratio_19A), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = log(ratio_19A), y = log(ratio_19F))) +
+  labs(size = "Total IPD cases") +
   theme_bw()
 ```
 

@@ -59,7 +59,7 @@ aus_coverage <- readxl::read_xlsx("data/australia-coverage-state.xlsx") |>
 
 (not super helpful)
 
-```{r}
+```{r, fig.width = 11}
 pacman::p_load(biscale)
 
 prop_biv <- aus_coverage |> 
@@ -73,8 +73,8 @@ prop_biv <- aus_coverage |>
 
 legend <- bi_legend(pal = "GrPink",
                     dim = 3,
-                    xlab = "Higher vax coverage",
-                    ylab = "Higher 19F proportion",
+                    xlab = "Vax coverage",
+                    ylab = "19F proportion",
                     size = 8)
 maps <- aus_shp |> 
   right_join(prop_biv, by = "state") |> 
