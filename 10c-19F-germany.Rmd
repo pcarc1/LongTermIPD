@@ -1493,6 +1493,50 @@ unstructured_result16 <- bym_st_result16 |>
 plot_grid(structured_result16, unstructured_result16, ncol = 2)
 ```
 
+## Scatterplot 19F vs vaccine
+
+```{r, fig.width = 11, fig.height = 5}
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = vacc_rate, y = ratio_19F, size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup, scales = "free_y") +
+  theme_bw() +
+  labs(x = "% vaccinated", y = "Proportion 19F cases") +
+  theme(text = element_text(size = 16),
+        legend.position = "none")
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = vacc_rate, y = ratio_19F, size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = vacc_rate, y = ratio_19F)) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "% vaccinated", y = "Proportion 19F cases") +
+  theme(text = element_text(size = 16))
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(vacc_rate), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "% vaccinated (log)", y = "Proportion 19F cases (log)") +
+  theme(text = element_text(size = 16))
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(vacc_rate), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = log(vacc_rate), y = log(ratio_19F))) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "% vaccinated (log)", y = "Proportion 19F cases (log)") +
+  theme(text = element_text(size = 16))
+```
+
+
 ## Scatterplot 19A vs 19F
 
 ```{r}
@@ -1521,5 +1565,45 @@ ger_ipd_19fa |>
   geom_smooth(aes(x = log(ratio_19A), y = log(ratio_19F))) +
   labs(size = "Total IPD cases") +
   theme_bw()
+```
+
+```{r, fig.width = 11, fig.height = 5}
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = ratio_19A, y = ratio_19F, size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup, scales = "free_y") +
+  theme_bw() +
+  labs(x = "Proportion 19A cases", y = "Proportion 19F cases") +
+  theme(text = element_text(size = 16))
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = ratio_19A, y = ratio_19F, size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = ratio_19A, y = ratio_19F)) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "Proportion 19A cases", y = "Proportion 19F cases") +
+  theme(text = element_text(size = 16))
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(ratio_19A), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "Proportion 19A cases (log)", y = "Proportion 19F cases (log)") +
+  theme(text = element_text(size = 16))
+
+ger_ipd_19fa |> 
+  ggplot() +
+  geom_point(aes(x = log(ratio_19A), y = log(ratio_19F), size = ipd), alpha = 0.5) +
+  geom_smooth(aes(x = log(ratio_19A), y = log(ratio_19F))) +
+  labs(size = "Total IPD cases") +
+  facet_grid(~yeargroup) +
+  theme_bw() +
+  labs(x = "Proportion 19A cases (log)", y = "Proportion 19F cases (log)") +
+  theme(text = element_text(size = 16))
 ```
 
